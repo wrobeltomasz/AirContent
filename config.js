@@ -113,6 +113,11 @@ export function assertConfigConsistent(cfg) {
         `must have one weight per feature (model.featureCount = ${featureCount}).`
     );
   }
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(cfg.database.table)) {
+    throw new Error(
+      `config: database.table "${cfg.database.table}" must contain only letters, digits, and underscores.`
+    );
+  }
   for (const field of cfg.validation.fields) {
     if (
       typeof field.min === 'number' &&

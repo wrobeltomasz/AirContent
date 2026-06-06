@@ -112,7 +112,7 @@ Response:
 #### Create record (validated metadata → database)
 
 ```bash
-curl -X POST http://localhost:3000/api/admin/api/records \
+curl -X POST http://localhost:3000/api/records \
   -H "Content-Type: application/json" \
   -d '{"metadata": {"area": 85, "rooms": 3, "floor": 2}, "tags": ["apartment", "sale"]}'
 ```
@@ -120,10 +120,10 @@ curl -X POST http://localhost:3000/api/admin/api/records \
 #### List records
 
 ```bash
-curl http://localhost:3000/api/admin/api/records?limit=10&offset=0
+curl "http://localhost:3000/api/records?limit=10&offset=0"
 
 # Filter by tag
-curl http://localhost:3000/api/admin/api/records?tag=apartment
+curl "http://localhost:3000/api/records?tag=apartment"
 ```
 
 #### Health check
@@ -401,7 +401,7 @@ model: {
 }
 ```
 
-Then restart the server to retrain.
+Save via the admin panel, then restart the server. The model is trained once at startup, so a restart is required to apply architecture changes.
 
 ## Project Structure
 
@@ -445,13 +445,14 @@ Then restart the server to retrain.
 | GET | `/health` | Server status and metrics |
 | POST | `/predict` | Predict from feature vector |
 | POST | `/api/predict-from-metadata` | Predict from validated metadata |
-| GET | `/api/admin/api/config` | Get current config |
-| POST | `/api/admin/api/config` | Save config changes |
-| POST | `/api/admin/api/config/reset` | Reset to defaults |
-| GET | `/api/admin/api/records` | List records (paginated, filterable) |
-| POST | `/api/admin/api/records` | Create record |
-| DELETE | `/api/admin/api/records/:id` | Delete record |
-| POST | `/api/admin/api/csv/import` | Import CSV file |
+| GET | `/api/config` | Get current config |
+| POST | `/api/config` | Save config changes |
+| POST | `/api/config/reset` | Reset to defaults |
+| GET | `/api/records` | List records (paginated, filterable) |
+| POST | `/api/records` | Create record |
+| GET | `/api/records/:id` | Get record by ID |
+| DELETE | `/api/records/:id` | Delete record |
+| POST | `/api/csv/import` | Import CSV file |
 | GET | `/admin` | Admin panel (HTML) |
 
 ## Error Handling
@@ -554,7 +555,7 @@ To add new validation fields:
 
 To add new API endpoints:
 1. Create route in `admin.js` or `ml-api.js`
-2. Use `/api/admin/*` prefix for admin routes
+2. Admin routes live in `admin.js` (mounted at root); ML routes in `ml-api.js`
 3. Validate input via `validation.js` or custom logic
 
 ## License

@@ -2,6 +2,7 @@
 
 import { createReadStream } from 'fs';
 import { insertRecord } from './db.js';
+import { validateRecord, ValidationError } from './validation.js';
 
 export class CSVImportError extends Error {
   constructor(message, row) {
@@ -51,7 +52,6 @@ export async function importCSV(filePath, options = {}) {
   return new Promise((resolve, reject) => {
     const imported = [];
     const errors = [];
-    let lineNumber = 0;
     let headers = null;
 
     const stream = createReadStream(filePath, { encoding: 'utf8' });
@@ -70,7 +70,7 @@ export async function importCSV(filePath, options = {}) {
 
       try {
         for (let i = 0; i < lines.length; i++) {
-          lineNumber = i + 1;
+          const lineNumber = i + 1;
           const line = lines[i].trim();
 
           if (!line) continue;
@@ -82,56 +82,66 @@ export async function importCSV(filePath, options = {}) {
             continue;
           }
 
-          const record = {};
-          for (const field of fieldNames) {
-            const colIndex = headers
-              ? headers.indexOf(field)
-              : fieldNames.indexOf(field);
-            if (colIndex === -1 || !values[colIndex]) {
-              throw new CSVImportError(
-                `Field "${field}" not found or empty`,
-                lineNumber
-              );
+          try {
+            const record = {};
+            for (const field of fieldNames) {
+              const colIndex = headers
+                ? headers.indexOf(field)
+                : fieldNames.indexOf(field);
+              if (colIndex === -1 || !values[colIndex]) {
+                throw new CSVImportError(
+                  `Field "${field}" not found or empty`,
+                  lineNumber
+                );
+              }
+              const raw = values[colIndex];
+              const num = parseFloat(raw);
+              record[field] = isNaN(num) ? raw : num;
             }
-            const value = values[colIndex];
-            record[field] = isNaN(value) ? value : parseFloat(value);
-          }
 
-          let tags = [];
-          if (tagsColumn) {
-            const tagColIndex = headers
-              ? headers.indexOf(tagsColumn)
-              : tagsColumn;
-            if (tagColIndex !== -1 && values[tagColIndex]) {
-              tags = values[tagColIndex]
-                .split(';')
-                .map((t) => t.trim())
-                .filter((t) => t);
+            validateRecord(record);
+
+            let tags = [];
+            if (tagsColumn) {
+              const tagColIndex = headers
+                ? headers.indexOf(tagsColumn)
+                : parseInt(tagsColumn, 10);
+              if (tagColIndex !== -1 && values[tagColIndex]) {
+                tags = values[tagColIndex]
+                  .split(';')
+                  .map((t) => t.trim())
+                  .filter((t) => t);
+              }
+            }
+
+            let price = null;
+            if (priceColumn) {
+              const priceColIndex = headers
+                ? headers.indexOf(priceColumn)
+                : parseInt(priceColumn, 10);
+              if (priceColIndex !== -1 && values[priceColIndex]) {
+                const parsed = parseFloat(values[priceColIndex]);
+                if (!isNaN(parsed)) price = parsed;
+              }
+            }
+
+            const dbRecord = await insertRecord(record, tags, price);
+            imported.push(dbRecord);
+          } catch (rowError) {
+            if (
+              rowError instanceof CSVImportError ||
+              rowError instanceof ValidationError
+            ) {
+              errors.push({ row: lineNumber, message: rowError.message });
+            } else {
+              throw rowError;
             }
           }
-
-          let price = null;
-          if (priceColumn) {
-            const priceColIndex = headers
-              ? headers.indexOf(priceColumn)
-              : priceColumn;
-            if (priceColIndex !== -1 && values[priceColIndex]) {
-              price = parseFloat(values[priceColIndex]);
-            }
-          }
-
-          const dbRecord = await insertRecord(record, tags, price);
-          imported.push(dbRecord);
         }
 
         resolve({ imported, errors });
       } catch (error) {
-        if (error instanceof CSVImportError) {
-          errors.push(error);
-          resolve({ imported, errors });
-        } else {
-          reject(error);
-        }
+        reject(error);
       }
     });
 

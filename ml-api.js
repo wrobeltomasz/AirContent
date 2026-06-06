@@ -1,9 +1,13 @@
 import express from 'express';
-import { createModel, trainModel, predict, FEATURE_COUNT } from './model.js';
+import { createModel, trainModel, predict } from './model.js';
 import { getConfig } from './config-store.js';
 import { metadataToFeatureVector, ValidationError } from './validation.js';
 import * as db from './db.js';
 import adminRoutes from './admin.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 let trainedModel = null;
@@ -72,9 +76,13 @@ async function startServer() {
   }
 
   app.use(express.json());
-  app.use(express.static('public'));
+  app.use(express.static(path.join(__dirname, 'public')));
 
-  app.use('/api/admin', adminRoutes);
+  app.use(adminRoutes);
+
+  app.get('/admin', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+  });
 
   app.get('/', (req, res) => {
     sendJson(res, 200, {
@@ -151,26 +159,33 @@ async function startServer() {
     try {
       const input = req.body;
 
-      if (!Array.isArray(input) || input.length !== FEATURE_COUNT) {
+      const featureCount = getConfig().model.featureCount;
+      if (!Array.isArray(input) || input.length !== featureCount) {
         state.errors += 1;
         log('warn', 'invalid input rejected', { body: JSON.stringify(input) });
         sendJson(res, 400, {
-          error: `Input must be an array of ${FEATURE_COUNT} numbers`,
+          error: `Input must be an array of ${featureCount} numbers`,
         });
         return;
       }
 
-      predict(trainedModel, input).then((value) => {
-        const output = Number(value.toFixed(2));
-        state.predictions += 1;
-        state.lastPrediction = {
-          input,
-          output,
-          at: new Date().toISOString(),
-        };
-        log('info', 'prediction', { input, output });
-        sendJson(res, 200, { input, prediction: output.toFixed(2) });
-      });
+      predict(trainedModel, input)
+        .then((value) => {
+          const output = Number(value.toFixed(2));
+          state.predictions += 1;
+          state.lastPrediction = {
+            input,
+            output,
+            at: new Date().toISOString(),
+          };
+          log('info', 'prediction', { input, output });
+          sendJson(res, 200, { input, prediction: output.toFixed(2) });
+        })
+        .catch((error) => {
+          state.errors += 1;
+          log('error', 'prediction failed', { message: error.message });
+          sendJson(res, 500, { error: error.message });
+        });
     } catch (error) {
       state.errors += 1;
       log('error', 'prediction failed', { message: error.message });
@@ -204,20 +219,26 @@ async function startServer() {
     try {
       const metadata = req.body;
       const input = metadataToFeatureVector(metadata);
-      predict(trainedModel, input).then((value) => {
-        const output = Number(value.toFixed(2));
-        state.predictions += 1;
-        state.lastPrediction = {
-          metadata,
-          prediction: output,
-          at: new Date().toISOString(),
-        };
-        sendJson(res, 200, {
-          metadata,
-          featureVector: input,
-          prediction: output.toFixed(2),
+      predict(trainedModel, input)
+        .then((value) => {
+          const output = Number(value.toFixed(2));
+          state.predictions += 1;
+          state.lastPrediction = {
+            metadata,
+            prediction: output,
+            at: new Date().toISOString(),
+          };
+          sendJson(res, 200, {
+            metadata,
+            featureVector: input,
+            prediction: output.toFixed(2),
+          });
+        })
+        .catch((error) => {
+          state.errors += 1;
+          log('error', 'prediction failed', { message: error.message });
+          sendJson(res, 500, { error: error.message });
         });
-      });
     } catch (error) {
       state.errors += 1;
       const message =

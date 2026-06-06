@@ -68,10 +68,9 @@ router.post('/api/records', express.json(), async (req, res) => {
     const record = await db.insertRecord(metadata, tags);
 
     const cfg = getConfig();
-    if (!cfg.metrics) cfg.metrics = {};
-    if (!cfg.metrics.business) cfg.metrics.business = {};
     cfg.metrics.business.recordsIngested =
       (cfg.metrics.business.recordsIngested || 0) + 1;
+    try { saveConfig(cfg); } catch { /* non-fatal */ }
 
     res.status(201).json(record);
   } catch (error) {
@@ -106,15 +105,18 @@ router.post('/api/csv/import', express.raw({ type: 'application/octet-stream' })
       priceColumn: req.query.priceColumn || null,
     };
 
-    const result = await importCSV(tempPath, options);
-
-    fs.unlinkSync(tempPath);
+    let result;
+    try {
+      result = await importCSV(tempPath, options);
+    } finally {
+      // Always remove the temp file, even if the import throws.
+      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+    }
 
     const cfg = getConfig();
-    if (!cfg.metrics) cfg.metrics = {};
-    if (!cfg.metrics.business) cfg.metrics.business = {};
     cfg.metrics.business.recordsIngested =
       (cfg.metrics.business.recordsIngested || 0) + result.imported.length;
+    try { saveConfig(cfg); } catch { /* non-fatal */ }
 
     res.json(result);
   } catch (error) {
