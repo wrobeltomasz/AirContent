@@ -3,6 +3,7 @@
 import express from 'express';
 import { getConfig, saveConfig, resetConfig } from './config-store.js';
 import * as db from './db.js';
+import { resetPool } from './db.js';
 import { validateRecord } from './validation.js';
 
 const router = express.Router();
@@ -11,10 +12,11 @@ router.get('/api/config', (req, res) => {
   res.json(getConfig());
 });
 
-router.post('/api/config', express.json(), (req, res) => {
+router.post('/api/config', express.json(), async (req, res) => {
   try {
     const newConfig = req.body;
     saveConfig(newConfig);
+    if (newConfig.database) await resetPool();
     res.json({ success: true, config: getConfig() });
   } catch (error) {
     res.status(400).json({ error: error.message });
@@ -75,6 +77,17 @@ router.post('/api/records', express.json(), async (req, res) => {
     res.status(201).json(record);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+router.get('/api/db/test', async (req, res) => {
+  await resetPool();
+  try {
+    await db.getPool().query('SELECT 1');
+    res.json({ success: true, message: 'Connection successful' });
+  } catch (error) {
+    await resetPool();
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

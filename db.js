@@ -6,7 +6,7 @@ import { getConfig } from './config-store.js';
 const { Pool } = pg;
 let pool = null;
 
-function getPool() {
+export function getPool() {
   if (!pool) {
     const cfg = getConfig().database;
     pool = new Pool({
@@ -14,8 +14,8 @@ function getPool() {
       port: cfg.port,
       database: cfg.database,
       user: cfg.user,
-      password: cfg.password,
-      ssl: cfg.ssl,
+      password: cfg.password || undefined,
+      ssl: cfg.ssl || false,
     });
   }
   return pool;
@@ -106,6 +106,13 @@ export async function countRecords() {
 export async function closePool() {
   if (pool) {
     await pool.end();
+    pool = null;
+  }
+}
+
+export async function resetPool() {
+  if (pool) {
+    try { await pool.end(); } catch { /* ignore */ }
     pool = null;
   }
 }
