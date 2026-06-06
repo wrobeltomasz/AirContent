@@ -1,0 +1,794 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AirContent Admin Panel</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        Ubuntu, Cantarell, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 14px;
+    }
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
+    .tab-btn {
+      padding: 10px 20px;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      cursor: pointer;
+      font-size: 14px;
+      color: #666;
+      transition: all 0.2s;
+    }
+    .tab-btn.active {
+      color: #0066cc;
+      border-bottom-color: #0066cc;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .panel {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 6px;
+      font-size: 14px;
+    }
+    input,
+    select,
+    textarea {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: #0066cc;
+      box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+    }
+    button {
+      padding: 10px 20px;
+      background: #0066cc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #0052a3;
+    }
+    button.secondary {
+      background: #ddd;
+      color: #333;
+    }
+    button.secondary:hover {
+      background: #ccc;
+    }
+    button.danger {
+      background: #e74c3c;
+    }
+    button.danger:hover {
+      background: #c0392b;
+    }
+    .button-group {
+      display: flex;
+      gap: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+    }
+    th,
+    td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+      font-size: 14px;
+    }
+    th {
+      background: #f9f9f9;
+      font-weight: 600;
+    }
+    tr:hover {
+      background: #f9f9f9;
+    }
+    .status {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .status.ready {
+      background: #d4edda;
+      color: #155724;
+    }
+    .status.training {
+      background: #fff3cd;
+      color: #856404;
+    }
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+    }
+    .alert {
+      padding: 12px 16px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-size: 14px;
+    }
+    .alert.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+    .alert.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+    .alert.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+    .fields-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .field-card {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 4px;
+      border: 1px solid #eee;
+    }
+    .field-card h3 {
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    .field-card p {
+      font-size: 13px;
+      color: #666;
+      margin: 4px 0;
+    }
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #666;
+    }
+    .spinner {
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #0066cc;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+    @keyframes spin {
+      0% {
+        transform: rotate(0deg);
+      }
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+    .file-input-wrapper {
+      position: relative;
+      display: inline-block;
+    }
+    .file-input-wrapper input[type='file'] {
+      display: none;
+    }
+    .file-label {
+      padding: 10px 20px;
+      background: #0066cc;
+      color: white;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 500;
+      display: inline-block;
+    }
+    .file-label:hover {
+      background: #0052a3;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 4px;
+      background: #eee;
+      border-radius: 2px;
+      margin-top: 8px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #0066cc;
+      border-radius: 2px;
+      transition: width 0.2s;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🏠 AirContent Admin Panel</h1>
+      <p class="subtitle">
+        Configure model hyperparameters, validation rules, database settings, and
+        manage records
+      </p>
+    </header>
+
+    <div id="alerts"></div>
+
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="validation">Validation</button>
+      <button class="tab-btn" data-tab="model">Model</button>
+      <button class="tab-btn" data-tab="database">Database</button>
+      <button class="tab-btn" data-tab="records">Records</button>
+      <button class="tab-btn" data-tab="import">CSV Import</button>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div id="dashboard" class="tab-content active">
+      <div class="panel">
+        <h2>System Overview</h2>
+        <table>
+          <tr>
+            <th>Setting</th>
+            <th>Value</th>
+          </tr>
+          <tr>
+            <td>Model Status</td>
+            <td><span class="status ready" id="modelStatus">Loading...</span></td>
+          </tr>
+          <tr>
+            <td>Records in Database</td>
+            <td id="recordCount">0</td>
+          </tr>
+          <tr>
+            <td>Validation Enabled</td>
+            <td id="validationEnabled">-</td>
+          </tr>
+          <tr>
+            <td>Feature Count</td>
+            <td id="featureCount">-</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- Validation Tab -->
+    <div id="validation" class="tab-content">
+      <div class="panel">
+        <h2>Validation Rules</h2>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="validationEnabledToggle" />
+            Enable Input Validation
+          </label>
+        </div>
+        <div id="fieldsList" class="fields-grid"></div>
+        <div style="margin-top: 16px">
+          <button onclick="saveValidationConfig()">Save Validation Rules</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Model Tab -->
+    <div id="model" class="tab-content">
+      <div class="panel">
+        <h2>Model Configuration</h2>
+        <div class="form-group">
+          <label>Learning Rate</label>
+          <input type="number" id="learningRate" step="0.001" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Dropout Rate</label>
+          <input type="number" id="dropoutRate" step="0.05" min="0" max="1" />
+        </div>
+        <div class="form-group">
+          <label>Hidden Units (comma-separated)</label>
+          <input type="text" id="hiddenUnits" placeholder="e.g., 32,16" />
+        </div>
+        <div class="form-group">
+          <label>Training Epochs</label>
+          <input type="number" id="epochs" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Batch Size</label>
+          <input type="number" id="batchSize" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Number of Training Samples</label>
+          <input type="number" id="numSamples" min="1" />
+        </div>
+        <div class="button-group">
+          <button onclick="saveModelConfig()">Save Model Config</button>
+          <button class="secondary" onclick="loadConfig()">Reset to Current</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Database Tab -->
+    <div id="database" class="tab-content">
+      <div class="panel">
+        <h2>PostgreSQL Configuration</h2>
+        <div class="form-group">
+          <label>Host</label>
+          <input type="text" id="dbHost" />
+        </div>
+        <div class="form-group">
+          <label>Port</label>
+          <input type="number" id="dbPort" />
+        </div>
+        <div class="form-group">
+          <label>Database Name</label>
+          <input type="text" id="dbDatabase" />
+        </div>
+        <div class="form-group">
+          <label>User</label>
+          <input type="text" id="dbUser" />
+        </div>
+        <div class="form-group">
+          <label>Password</label>
+          <input type="password" id="dbPassword" />
+        </div>
+        <div class="form-group">
+          <label>Table Name</label>
+          <input type="text" id="dbTable" />
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="dbSSL" />
+            Use SSL
+          </label>
+        </div>
+        <div class="button-group">
+          <button onclick="saveDatabaseConfig()">Save Database Config</button>
+          <button class="secondary" onclick="loadConfig()">Reset to Current</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Records Tab -->
+    <div id="records" class="tab-content">
+      <div class="panel">
+        <h2>Database Records</h2>
+        <div class="form-group">
+          <label>Filter by Tag</label>
+          <select id="tagFilter" onchange="loadRecords()">
+            <option value="">All Records</option>
+          </select>
+        </div>
+        <div id="recordsList"></div>
+        <div style="margin-top: 16px">
+          <button onclick="loadRecords()">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CSV Import Tab -->
+    <div id="import" class="tab-content">
+      <div class="panel">
+        <h2>Import Records from CSV</h2>
+        <div class="form-group">
+          <label>Field Mapping</label>
+          <div style="font-size: 13px; color: #666; margin-bottom: 8px">
+            Map CSV columns to required fields (in order)
+          </div>
+          <div id="fieldMapping"></div>
+        </div>
+        <div class="form-group">
+          <label>
+            <input type="checkbox" id="csvHasHeader" checked />
+            First row is header
+          </label>
+        </div>
+        <div class="form-group">
+          <label>Tags Column (optional)</label>
+          <input type="text" id="csvTagsColumn" placeholder="e.g., tags" />
+        </div>
+        <div class="form-group">
+          <label>Price Column (optional)</label>
+          <input type="text" id="csvPriceColumn" placeholder="e.g., price" />
+        </div>
+        <div class="form-group">
+          <div class="file-input-wrapper">
+            <label class="file-label">
+              Choose CSV File
+              <input type="file" id="csvFile" accept=".csv" />
+            </label>
+          </div>
+          <div id="csvFileName"></div>
+        </div>
+        <div class="button-group">
+          <button onclick="importCSV()">Import Records</button>
+        </div>
+        <div id="importProgress"></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentConfig = null;
+
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab-btn').forEach((b) =>
+          b.classList.remove('active')
+        );
+        document.querySelectorAll('.tab-content').forEach((c) =>
+          c.classList.remove('active')
+        );
+        btn.classList.add('active');
+        document.getElementById(btn.dataset.tab).classList.add('active');
+      });
+    });
+
+    function showAlert(message, type = 'info') {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = `alert ${type}`;
+      alertDiv.textContent = message;
+      document.getElementById('alerts').appendChild(alertDiv);
+      setTimeout(() => alertDiv.remove(), 5000);
+    }
+
+    async function loadConfig() {
+      try {
+        const response = await fetch('/api/config');
+        currentConfig = await response.json();
+
+        // Update dashboard
+        document.getElementById('modelStatus').className = 'status ready';
+        document.getElementById('modelStatus').textContent = 'Ready';
+        document.getElementById('validationEnabled').textContent = currentConfig
+          .validation.enabled
+          ? 'Yes'
+          : 'No';
+        document.getElementById('featureCount').textContent =
+          currentConfig.model.featureCount;
+
+        // Load record count
+        const recordResponse = await fetch('/api/records?limit=1');
+        const recordData = await recordResponse.json();
+        document.getElementById('recordCount').textContent = recordData.count;
+
+        // Populate model config
+        document.getElementById('learningRate').value =
+          currentConfig.model.learningRate;
+        document.getElementById('dropoutRate').value = currentConfig.model.dropoutRate;
+        document.getElementById('hiddenUnits').value =
+          currentConfig.model.hiddenUnits.join(',');
+        document.getElementById('epochs').value = currentConfig.training.epochs;
+        document.getElementById('batchSize').value = currentConfig.training.batchSize;
+        document.getElementById('numSamples').value = currentConfig.training.numSamples;
+
+        // Populate validation config
+        document.getElementById('validationEnabledToggle').checked =
+          currentConfig.validation.enabled;
+        populateValidationFields();
+
+        // Populate database config
+        document.getElementById('dbHost').value = currentConfig.database.host;
+        document.getElementById('dbPort').value = currentConfig.database.port;
+        document.getElementById('dbDatabase').value = currentConfig.database.database;
+        document.getElementById('dbUser').value = currentConfig.database.user;
+        document.getElementById('dbPassword').value = currentConfig.database.password;
+        document.getElementById('dbTable').value = currentConfig.database.table;
+        document.getElementById('dbSSL').checked = currentConfig.database.ssl;
+
+        // Populate field mapping
+        populateFieldMapping();
+
+        // Load tags for filter
+        loadTagsForFilter();
+      } catch (error) {
+        showAlert('Failed to load config: ' + error.message, 'error');
+      }
+    }
+
+    function populateValidationFields() {
+      const container = document.getElementById('fieldsList');
+      container.innerHTML = '';
+
+      currentConfig.validation.fields.forEach((field) => {
+        const card = document.createElement('div');
+        card.className = 'field-card';
+        card.innerHTML = `
+          <h3>${field.label}</h3>
+          <p><strong>Key:</strong> ${field.key}</p>
+          <p><strong>Range:</strong> ${field.min} to ${field.max}</p>
+          <p><strong>Type:</strong> ${field.integer ? 'Integer' : 'Decimal'}</p>
+          <p><strong>Required:</strong> ${field.required ? 'Yes' : 'No'}</p>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function populateFieldMapping() {
+      const container = document.getElementById('fieldMapping');
+      container.innerHTML = '';
+
+      currentConfig.validation.fields.forEach((field, idx) => {
+        const group = document.createElement('div');
+        group.className = 'form-group';
+        group.innerHTML = `
+          <label>${field.label} (${field.key})</label>
+          <input type="text" id="csvField${idx}" placeholder="CSV column name" />
+        `;
+        container.appendChild(group);
+      });
+    }
+
+    function loadTagsForFilter() {
+      const select = document.getElementById('tagFilter');
+      const existingOptions = Array.from(select.options).map((o) => o.value);
+
+      currentConfig.tags.forEach((tag) => {
+        if (!existingOptions.includes(tag)) {
+          const option = document.createElement('option');
+          option.value = tag;
+          option.textContent = tag;
+          select.appendChild(option);
+        }
+      });
+    }
+
+    async function saveModelConfig() {
+      currentConfig.model.learningRate = parseFloat(
+        document.getElementById('learningRate').value
+      );
+      currentConfig.model.dropoutRate = parseFloat(
+        document.getElementById('dropoutRate').value
+      );
+      currentConfig.model.hiddenUnits = document
+        .getElementById('hiddenUnits')
+        .value.split(',')
+        .map((v) => parseInt(v.trim()));
+      currentConfig.training.epochs = parseInt(document.getElementById('epochs').value);
+      currentConfig.training.batchSize = parseInt(
+        document.getElementById('batchSize').value
+      );
+      currentConfig.training.numSamples = parseInt(
+        document.getElementById('numSamples').value
+      );
+
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentConfig),
+        });
+        const result = await response.json();
+        if (result.success) {
+          showAlert('Model configuration saved', 'success');
+        } else {
+          showAlert('Failed to save config: ' + result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('Error: ' + error.message, 'error');
+      }
+    }
+
+    async function saveValidationConfig() {
+      currentConfig.validation.enabled = document.getElementById(
+        'validationEnabledToggle'
+      ).checked;
+
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentConfig),
+        });
+        const result = await response.json();
+        if (result.success) {
+          showAlert('Validation rules saved', 'success');
+        } else {
+          showAlert('Failed to save config: ' + result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('Error: ' + error.message, 'error');
+      }
+    }
+
+    async function saveDatabaseConfig() {
+      currentConfig.database.host = document.getElementById('dbHost').value;
+      currentConfig.database.port = parseInt(
+        document.getElementById('dbPort').value
+      );
+      currentConfig.database.database = document.getElementById('dbDatabase').value;
+      currentConfig.database.user = document.getElementById('dbUser').value;
+      currentConfig.database.password = document.getElementById('dbPassword').value;
+      currentConfig.database.table = document.getElementById('dbTable').value;
+      currentConfig.database.ssl = document.getElementById('dbSSL').checked;
+
+      try {
+        const response = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(currentConfig),
+        });
+        const result = await response.json();
+        if (result.success) {
+          showAlert('Database configuration saved', 'success');
+        } else {
+          showAlert('Failed to save config: ' + result.error, 'error');
+        }
+      } catch (error) {
+        showAlert('Error: ' + error.message, 'error');
+      }
+    }
+
+    async function loadRecords() {
+      const tag = document.getElementById('tagFilter').value;
+      const url = `/api/records${tag ? `?tag=${encodeURIComponent(tag)}` : ''}`;
+
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const container = document.getElementById('recordsList');
+        if (data.records.length === 0) {
+          container.innerHTML = '<p style="color: #999;">No records found</p>';
+          return;
+        }
+
+        let html = '<table><thead><tr>';
+        html += '<th>ID</th><th>Metadata</th><th>Tags</th><th>Price</th><th>Action</th>';
+        html += '</tr></thead><tbody>';
+
+        data.records.forEach((record) => {
+          const metadata = JSON.stringify(record.metadata);
+          const tags = (record.tags || []).join(', ');
+          html += `<tr>
+            <td>${record.id}</td>
+            <td style="font-size: 12px; font-family: monospace;">${metadata}</td>
+            <td>${tags}</td>
+            <td>${record.price || '-'}</td>
+            <td><button class="secondary" onclick="deleteRecord(${record.id})">Delete</button></td>
+          </tr>`;
+        });
+
+        html += '</tbody></table>';
+        container.innerHTML = html;
+      } catch (error) {
+        showAlert('Failed to load records: ' + error.message, 'error');
+      }
+    }
+
+    async function deleteRecord(id) {
+      if (!confirm('Delete this record?')) return;
+
+      try {
+        await fetch(`/api/records/${id}`, { method: 'DELETE' });
+        showAlert('Record deleted', 'success');
+        loadRecords();
+      } catch (error) {
+        showAlert('Failed to delete: ' + error.message, 'error');
+      }
+    }
+
+    async function importCSV() {
+      const fileInput = document.getElementById('csvFile');
+      if (!fileInput.files[0]) {
+        showAlert('Please select a CSV file', 'error');
+        return;
+      }
+
+      const hasHeader = document.getElementById('csvHasHeader').checked;
+      const tagsColumn = document.getElementById('csvTagsColumn').value || null;
+      const priceColumn = document.getElementById('csvPriceColumn').value || null;
+
+      const fields = currentConfig.validation.fields
+        .map((_, idx) => document.getElementById(`csvField${idx}`).value)
+        .filter((v) => v);
+
+      if (fields.length === 0) {
+        showAlert('Please map at least one field', 'error');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const query = new URLSearchParams({
+        fields: fields.join(','),
+        hasHeader: hasHeader ? 'true' : 'false',
+        tagsColumn: tagsColumn || '',
+        priceColumn: priceColumn || '',
+      });
+
+      try {
+        const response = await fetch(`/api/csv/import?${query}`, {
+          method: 'POST',
+          body: file,
+          headers: { 'Content-Type': 'application/octet-stream' },
+        });
+        const result = await response.json();
+
+        if (result.imported && result.imported.length > 0) {
+          showAlert(`Imported ${result.imported.length} records`, 'success');
+          fileInput.value = '';
+          loadRecords();
+        }
+        if (result.errors && result.errors.length > 0) {
+          showAlert(
+            `Errors: ${result.errors.map((e) => e.message).join('; ')}`,
+            'error'
+          );
+        }
+      } catch (error) {
+        showAlert('Import failed: ' + error.message, 'error');
+      }
+    }
+
+    // File input display
+    document.getElementById('csvFile').addEventListener('change', function () {
+      const fileName = this.files[0]?.name || '';
+      document.getElementById('csvFileName').textContent = fileName
+        ? `Selected: ${fileName}`
+        : '';
+    });
+
+    // Initial load
+    loadConfig();
+  </script>
+</body>
+</html>
