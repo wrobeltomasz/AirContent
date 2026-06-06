@@ -1,0 +1,116 @@
+{
+  "road_segments": [
+    {
+      "region": "Masovian",
+      "road_quality": 8,
+      "pct_highway": 35,
+      "pct_urban": 45,
+      "pct_rural": 20
+    },
+    {
+      "region": "Silesian",
+      "road_quality": 8,
+      "pct_highway": 40,
+      "pct_urban": 45,
+      "pct_rural": 15
+    },
+    {
+      "region": "Lesser Poland",
+      "road_quality": 7,
+      "pct_highway": 30,
+      "pct_urban": 40,
+      "pct_rural": 30
+    },
+    {
+      "region": "Greater Poland",
+      "road_quality": 7,
+      "pct_highway": 32,
+      "pct_urban": 35,
+      "pct_rural": 33
+    },
+    {
+      "region": "Lower Silesian",
+      "road_quality": 7,
+      "pct_highway": 33,
+      "pct_urban": 38,
+      "pct_rural": 29
+    },
+    {
+      "region": "Pomeranian",
+      "road_quality": 7,
+      "pct_highway": 30,
+      "pct_urban": 42,
+      "pct_rural": 28
+    },
+    {
+      "region": "Opole",
+      "road_quality": 7,
+      "pct_highway": 30,
+      "pct_urban": 33,
+      "pct_rural": 37
+    },
+    {
+      "region": "Lodz",
+      "road_quality": 6,
+      "pct_highway": 28,
+      "pct_urban": 40,
+      "pct_rural": 32
+    },
+    {
+      "region": "Kuyavian",
+      "road_quality": 6,
+      "pct_highway": 25,
+      "pct_urban": 38,
+      "pct_rural": 37
+    },
+    {
+      "region": "West Pomeranian",
+      "road_quality": 6,
+      "pct_highway": 22,
+      "pct_urban": 35,
+      "pct_rural": 43
+    },
+    {
+      "region": "Lubusz",
+      "road_quality": 6,
+      "pct_highway": 24,
+      "pct_urban": 30,
+      "pct_rural": 46
+    },
+    {
+      "region": "Subcarpathian",
+      "road_quality": 5,
+      "pct_highway": 15,
+      "pct_urban": 30,
+      "pct_rural": 55
+    },
+    {
+      "region": "Lublin",
+      "road_quality": 5,
+      "pct_highway": 14,
+      "pct_urban": 28,
+      "pct_rural": 58
+    },
+    {
+      "region": "Warmian-Masurian",
+      "road_quality": 5,
+      "pct_highway": 12,
+      "pct_urban": 25,
+      "pct_rural": 63
+    },
+    {
+      "region": "Holy Cross",
+      "road_quality": 5,
+      "pct_highway": 12,
+      "pct_urban": 28,
+      "pct_rural": 60
+    },
+    {
+      "region": "Podlaskie",
+      "road_quality": 4,
+      "pct_highway": 10,
+      "pct_urban": 22,
+      "pct_rural": 68
+    }
+  ]
+}

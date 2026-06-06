@@ -1,0 +1,44 @@
+{
+  "name": "aircontent",
+  "version": "2.0.0",
+  "description": "Self-contained Node.js + TensorFlow.js real estate price prediction with PostgreSQL storage, configurable validation, CSV import, and a browser-based admin panel.",
+  "type": "module",
+  "main": "ml-api.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node ml-api.js",
+    "ml:api": "node ml-api.js",
+    "ml:train": "node ml-model.js",
+    "db:init": "node --input-type=module -e \"import('./db.js').then(m=>m.initSchema()).then(()=>{console.log('Schema ready');process.exit(0)}).catch(e=>{console.error(e.message);process.exit(1)})\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "node --test"
+  },
+  "keywords": [
+    "tensorflow",
+    "tfjs",
+    "machine-learning",
+    "real-estate",
+    "price-prediction",
+    "postgresql",
+    "express",
+    "admin-panel"
+  ],
+  "author": "Tomasz Wrobel",
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.4.1",
+    "prettier": "^3.8.3"
+  },
+  "dependencies": {
+    "@tensorflow/tfjs": "^4.22.0",
+    "@tensorflow/tfjs-layers": "^4.22.0",
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
+}
