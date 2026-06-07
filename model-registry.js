@@ -37,11 +37,65 @@ function ensureDir(dir) {
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 }
 
+// The browser `@tensorflow/tfjs` build has no file:// IO handler (that ships
+// only with tfjs-node), so we persist with custom in-memory IO handlers and
+// write the artifacts to disk ourselves: model.json (topology + weight specs)
+// + weights.bin (raw weight bytes), matching the standard TF.js layout.
 async function saveModelToDisk(name, model, meta) {
   const dir = path.join(MODELS_DIR, name);
   ensureDir(dir);
-  await model.save(`file://${dir}`);
-  writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+  await model.save(
+    tf.io.withSaveHandler(async (artifacts) => {
+      const modelJson = {
+        modelTopology: artifacts.modelTopology,
+        format: artifacts.format,
+        generatedBy: artifacts.generatedBy,
+        convertedBy: artifacts.convertedBy,
+        weightsManifest: [
+          { paths: ['weights.bin'], weights: artifacts.weightSpecs },
+        ],
+      };
+      writeFileSync(
+        path.join(dir, 'model.json'),
+        JSON.stringify(modelJson),
+        'utf8'
+      );
+      writeFileSync(
+        path.join(dir, 'weights.bin'),
+        Buffer.from(artifacts.weightData)
+      );
+      return {
+        modelArtifactsInfo: {
+          dateSaved: new Date(),
+          modelTopologyType: 'JSON',
+        },
+      };
+    })
+  );
+  writeFileSync(
+    path.join(dir, 'meta.json'),
+    JSON.stringify(meta, null, 2),
+    'utf8'
+  );
+}
+
+async function loadModelFromDisk(dir) {
+  const modelJson = JSON.parse(
+    readFileSync(path.join(dir, 'model.json'), 'utf8')
+  );
+  const weightBuf = readFileSync(path.join(dir, 'weights.bin'));
+  const weightData = weightBuf.buffer.slice(
+    weightBuf.byteOffset,
+    weightBuf.byteOffset + weightBuf.byteLength
+  );
+  const weightSpecs = modelJson.weightsManifest[0].weights;
+  return tf.loadLayersModel(
+    tf.io.fromMemory({
+      modelTopology: modelJson.modelTopology,
+      weightSpecs,
+      weightData,
+    })
+  );
 }
 
 export async function initRegistry() {
@@ -57,20 +111,31 @@ export async function initRegistry() {
     if (!existsSync(metaPath) || !existsSync(modelPath)) continue;
     try {
       const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
-      const model = await tf.loadLayersModel(`file://${modelPath}`);
+      const model = await loadModelFromDisk(dir);
       registry.set(entry.name, { model, meta });
     } catch (e) {
-      console.warn(`[registry] failed to load model "${entry.name}": ${e.message}`);
+      console.warn(
+        `[registry] failed to load model "${entry.name}": ${e.message}`
+      );
     }
   }
 }
 
 // Build (train) one named model from a CSV file.
 //   options.description           — business context for the model (required)
-//   options.columnMap/filter/target — forwarded to mapDataset (data slice)
+//   options.type                  — model type (schema of properties + target);
+//                                    defaults to the global validation schema
+//   options.filter                — restrict rows (build models from data slices)
 //   options.sigma/dirtinessThreshold — measure cleaning thresholds
 export async function buildModelFromCSV(name, filePath, options = {}) {
-  const { description, sigma, dirtinessThreshold, ...mapOptions } = options;
+  const {
+    description,
+    type,
+    sigma,
+    dirtinessThreshold,
+    filter,
+    ...mapOptions
+  } = options;
 
   if (!name || !String(name).trim()) {
     throw new Error('buildModelFromCSV: a model name is required');
@@ -81,14 +146,25 @@ export async function buildModelFromCSV(name, filePath, options = {}) {
     );
   }
 
-  const data = mapDataset(filePath, mapOptions);
+  // A type defines the properties (feature vector) and target column. Without
+  // one the model falls back to the global validation schema in config.js.
+  const fields = type ? type.fields : getConfig().validation.fields;
+  const targetMeta = type
+    ? type.target
+    : { key: 'price', label: 'Price', column: 'price' };
+
+  const data = mapDataset(filePath, {
+    ...mapOptions,
+    fields,
+    target: targetMeta,
+    filter,
+  });
   if (!data.vectors.length) {
     throw new Error(
       `buildModelFromCSV("${name}"): no valid rows after mapping`
     );
   }
 
-  const fields = getConfig().validation.fields;
   const analysis = computeMeasures(data.vectors, data.prices, {
     fields,
     fieldStats: data.fieldStats,
@@ -100,12 +176,15 @@ export async function buildModelFromCSV(name, filePath, options = {}) {
   // the network ever sees the data.
   const cleaned = cleanMatrix(data.vectors, analysis.measures, analysis.sigma);
 
-  const model = createModel();
+  const model = createModel(fields.length);
   const { finalMae } = await trainModelOnData(model, cleaned, data.prices);
 
   const meta = {
     name,
     description: String(description).trim(),
+    typeId: type ? type.id : null,
+    typeLabel: type ? type.label : 'Default (config schema)',
+    target: targetMeta,
     source: filePath,
     featureKeys: fields.map((f) => f.key),
     featureLabels: fields.map((f) => f.label),

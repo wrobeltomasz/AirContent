@@ -1,7 +1,7 @@
 {
   "name": "aircontent",
-  "version": "2.0.0",
-  "description": "Self-contained Node.js + TensorFlow.js real estate price prediction with PostgreSQL storage, configurable validation, CSV import, and a browser-based admin panel.",
+  "version": "2.1.0",
+  "description": "Self-contained Node.js + TensorFlow.js multi-domain price prediction with a model-type wizard (real estate, cars, payroll, custom), disk-persisted models, PostgreSQL storage, configurable validation, CSV import, and a browser-based admin panel.",
   "type": "module",
   "main": "ml-api.js",
   "engines": {
@@ -21,11 +21,15 @@
     "tensorflow",
     "tfjs",
     "machine-learning",
-    "real-estate",
+    "regression",
     "price-prediction",
+    "model-types",
+    "wizard",
+    "real-estate",
     "postgresql",
     "express",
-    "admin-panel"
+    "admin-panel",
+    "nodejs"
   ],
   "author": "Tomasz Wrobel",
   "license": "MIT",

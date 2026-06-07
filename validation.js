@@ -10,16 +10,15 @@ export class ValidationError extends Error {
   }
 }
 
-export function validateRecord(metadata) {
-  const cfg = getConfig();
-
-  if (!cfg.validation.enabled) {
-    return true;
-  }
+// Validate a record against an explicit list of field definitions. Shared by
+// the global validator (config.validation.fields) and the model-type pipeline,
+// which validates against the properties of a chosen model type instead.
+export function validateAgainstFields(metadata, fields, enabled = true) {
+  if (!enabled) return true;
 
   const errors = [];
 
-  for (const field of cfg.validation.fields) {
+  for (const field of fields) {
     const value = metadata[field.key];
 
     // Required check
@@ -56,6 +55,15 @@ export function validateRecord(metadata) {
   }
 
   return true;
+}
+
+export function validateRecord(metadata) {
+  const cfg = getConfig();
+  return validateAgainstFields(
+    metadata,
+    cfg.validation.fields,
+    cfg.validation.enabled
+  );
 }
 
 export function metadataToFeatureVector(metadata) {

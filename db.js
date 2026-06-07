@@ -83,10 +83,9 @@ export async function getRecords(limit = 100, offset = 0, tag = null) {
 export async function getRecordById(id) {
   const cfg = getConfig();
   const table = cfg.database.table;
-  const result = await getPool().query(
-    `SELECT * FROM ${table} WHERE id = $1`,
-    [id]
-  );
+  const result = await getPool().query(`SELECT * FROM ${table} WHERE id = $1`, [
+    id,
+  ]);
   return result.rows[0] || null;
 }
 
@@ -112,7 +111,11 @@ export async function closePool() {
 
 export async function resetPool() {
   if (pool) {
-    try { await pool.end(); } catch { /* ignore */ }
+    try {
+      await pool.end();
+    } catch {
+      /* ignore */
+    }
     pool = null;
   }
 }

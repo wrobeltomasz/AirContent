@@ -4,8 +4,14 @@ import * as tf from '@tensorflow/tfjs';
 import '@tensorflow/tfjs-layers';
 import { getConfig } from './config-store.js';
 
-export function createModel() {
-  const { featureCount, hiddenUnits, dropoutRate, learningRate } = getConfig().model;
+export function createModel(featureCountOverride) {
+  const {
+    featureCount: cfgCount,
+    hiddenUnits,
+    dropoutRate,
+    learningRate,
+  } = getConfig().model;
+  const featureCount = featureCountOverride || cfgCount;
   const [firstUnits, ...restUnits] = hiddenUnits;
 
   const layers = [
@@ -15,9 +21,7 @@ export function createModel() {
       activation: 'relu',
     }),
     tf.layers.dropout({ rate: dropoutRate }),
-    ...restUnits.map((units) =>
-      tf.layers.dense({ units, activation: 'relu' })
-    ),
+    ...restUnits.map((units) => tf.layers.dense({ units, activation: 'relu' })),
     tf.layers.dense({ units: 1, activation: 'linear' }),
   ];
 
@@ -33,7 +37,9 @@ export function createModel() {
 export function generateData(numSamples) {
   const cfg = getConfig();
   const features = tf.randomNormal([numSamples, cfg.model.featureCount]);
-  const labels = features.mul(tf.tensor1d(cfg.training.targetWeights)).sum(1, true);
+  const labels = features
+    .mul(tf.tensor1d(cfg.training.targetWeights))
+    .sum(1, true);
   return { features, labels };
 }
 

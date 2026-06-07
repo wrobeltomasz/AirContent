@@ -72,7 +72,11 @@ router.post('/api/records', express.json(), async (req, res) => {
     const cfg = getConfig();
     cfg.metrics.business.recordsIngested =
       (cfg.metrics.business.recordsIngested || 0) + 1;
-    try { saveConfig(cfg); } catch { /* non-fatal */ }
+    try {
+      saveConfig(cfg);
+    } catch {
+      /* non-fatal */
+    }
 
     res.status(201).json(record);
   } catch (error) {
@@ -100,41 +104,49 @@ router.delete('/api/records/:id', async (req, res) => {
   }
 });
 
-router.post('/api/csv/import', express.raw({ type: 'application/octet-stream' }), async (req, res) => {
-  try {
-    const { importCSV } = await import('./csv-import.js');
-    const fs = await import('fs');
-    const path = await import('path');
-    const { fileURLToPath } = await import('url');
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const tempPath = path.join(__dirname, `temp-${Date.now()}.csv`);
-
-    fs.writeFileSync(tempPath, req.body);
-
-    const options = {
-      fieldNames: req.query.fields ? req.query.fields.split(',') : [],
-      hasHeader: req.query.hasHeader !== 'false',
-      tagsColumn: req.query.tagsColumn || null,
-      priceColumn: req.query.priceColumn || null,
-    };
-
-    let result;
+router.post(
+  '/api/csv/import',
+  express.raw({ type: 'application/octet-stream' }),
+  async (req, res) => {
     try {
-      result = await importCSV(tempPath, options);
-    } finally {
-      // Always remove the temp file, even if the import throws.
-      if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      const { importCSV } = await import('./csv-import.js');
+      const fs = await import('fs');
+      const path = await import('path');
+      const { fileURLToPath } = await import('url');
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const tempPath = path.join(__dirname, `temp-${Date.now()}.csv`);
+
+      fs.writeFileSync(tempPath, req.body);
+
+      const options = {
+        fieldNames: req.query.fields ? req.query.fields.split(',') : [],
+        hasHeader: req.query.hasHeader !== 'false',
+        tagsColumn: req.query.tagsColumn || null,
+        priceColumn: req.query.priceColumn || null,
+      };
+
+      let result;
+      try {
+        result = await importCSV(tempPath, options);
+      } finally {
+        // Always remove the temp file, even if the import throws.
+        if (fs.existsSync(tempPath)) fs.unlinkSync(tempPath);
+      }
+
+      const cfg = getConfig();
+      cfg.metrics.business.recordsIngested =
+        (cfg.metrics.business.recordsIngested || 0) + result.imported.length;
+      try {
+        saveConfig(cfg);
+      } catch {
+        /* non-fatal */
+      }
+
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ error: error.message });
     }
-
-    const cfg = getConfig();
-    cfg.metrics.business.recordsIngested =
-      (cfg.metrics.business.recordsIngested || 0) + result.imported.length;
-    try { saveConfig(cfg); } catch { /* non-fatal */ }
-
-    res.json(result);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
   }
-});
+);
 
 export default router;

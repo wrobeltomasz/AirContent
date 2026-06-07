@@ -11,6 +11,13 @@ package-lock.json.backup
 # ── Runtime config overrides (admin panel saves here) ────────
 runtime-config.json
 
+# ── Custom / edited model types (wizard saves here) ──────────
+model-types.json
+
+# ── Trained models persisted to disk (runtime artifacts) ─────
+models/*
+!models/.gitkeep
+
 # ── Temporary files ──────────────────────────────────────────
 tmp/*
 !tmp/.gitkeep

@@ -91,15 +91,17 @@ async function startServer() {
   app.get('/', (req, res) => {
     sendJson(res, 200, {
       message: 'AirContent ML API',
-      version: '2.0.0',
+      version: '2.1.0',
       endpoints: {
         'POST /predict': 'Send feature vector for prediction',
         'GET /health': 'System status and metrics',
         'GET /admin': 'Admin panel (browser)',
         'POST /api/records': 'Create record (admin)',
         'GET /api/records': 'List records (admin)',
+        'GET /api/model-types': 'List model types / wizard catalogue (admin)',
+        'POST /api/model-types': 'Create or update a model type (admin)',
         'GET /api/models': 'List trained models (admin)',
-        'POST /api/models': 'Build a model from a dataset (admin)',
+        'POST /api/models': 'Build a model from a type + dataset (admin)',
         'POST /api/models/:name/predict': 'Predict with a named model (admin)',
       },
       example:
@@ -168,7 +170,9 @@ async function startServer() {
       process: {
         heapUsedMB: parseFloat((mem.heapUsed / 1048576).toFixed(1)),
         heapTotalMB: parseFloat((mem.heapTotal / 1048576).toFixed(1)),
-        heapUsagePct: parseFloat(((mem.heapUsed / mem.heapTotal) * 100).toFixed(1)),
+        heapUsagePct: parseFloat(
+          ((mem.heapUsed / mem.heapTotal) * 100).toFixed(1)
+        ),
         rssMB: parseFloat((mem.rss / 1048576).toFixed(1)),
         externalMB: parseFloat((mem.external / 1048576).toFixed(1)),
         uptimeSeconds: Math.floor(process.uptime()),

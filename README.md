@@ -1,13 +1,15 @@
-# AirContent — Real Estate Price Prediction with Admin Panel
+# AirContent — Multi-Domain Price Prediction with Admin Panel
 
-A production-ready Node.js + TensorFlow.js ML system for real estate price prediction with a browser-based admin panel, PostgreSQL persistence, configurable validation, and CSV import.
+A production-ready Node.js + TensorFlow.js ML system that trains regression models for any domain — real estate, cars, payroll, or your own — through a **model-type wizard**, with a browser-based admin panel, PostgreSQL persistence, configurable validation, and CSV import.
 
 ## Features
 
-- **ML Model:** TensorFlow.js regression network with configurable architecture
+- **Model-Type Wizard:** Define what each model trains on — real estate, cars, payroll, or any user-defined type with its own properties and target
+- **ML Model:** TensorFlow.js regression network with configurable architecture; the input size adapts to the chosen type
+- **Disk Persistence:** Trained models are saved to `models/` and reloaded automatically on startup
 - **Database:** PostgreSQL storage with JSONB metadata and tagging
 - **Validation:** JavaScript-based input validation (configurable via admin panel)
-- **Admin Panel:** Browser-based UI to configure model, validation, database, and manage records
+- **Admin Panel:** Browser-based UI to configure model types, model, validation, database, and manage records
 - **CSV Import:** Bulk record upload with field mapping
 - **REST API:** Prediction endpoints supporting both raw features and structured metadata
 - **Health Checks:** Live server state and metrics endpoint
@@ -63,9 +65,11 @@ npm run ml:api
 Open **http://localhost:3000/admin** in your browser.
 
 **Tabs:**
+
 - **Dashboard** — System overview and metrics
 - **System** — Live server hardware stats: RAM, CPU, process heap, request counters, uptime (auto-refreshes every 5 s)
-- **Models** — Train several models on different data slices and inspect each one's measures
+- **Models** — Train models from a chosen type (and optional data slice) and inspect each one's measures
+- **Model Types** — Wizard to define what each model trains on: properties + target, for built-in or custom types
 - **Validation** — Configure input validation rules and allowed ranges
 - **Model** — Tune hyperparameters (learning rate, hidden units, epochs, etc.)
 - **Database** — Configure PostgreSQL connection
@@ -74,16 +78,39 @@ Open **http://localhost:3000/admin** in your browser.
 
 All changes are persisted to `runtime-config.json` and applied immediately.
 
+### Model Types (Wizard)
+
+A **model type** is a named schema that decides what a model trains on: an
+ordered list of **properties** (each property maps to one numeric input of the
+network and to one CSV column) plus the **target** column to predict. This is
+what lets the system train on more than one static schema.
+
+Three built-in types ship with the project:
+
+| Type            | Properties                       | Target   | Default dataset              |
+| --------------- | -------------------------------- | -------- | ---------------------------- |
+| **Real Estate** | `area`, `rooms`, `floor`         | `price`  | `csv_example/properties.csv` |
+| **Cars**        | `age`, `mileage`, `power`        | `price`  | `csv_example/cars.csv`       |
+| **Payroll**     | `experience`, `age`, `education` | `salary` | `csv_example/payroll.csv`    |
+
+From the **Model Types** tab you can create your own type (e.g. trucks,
+laptops), edit a built-in, or revert an edited built-in to its shipped defaults.
+Custom and edited types are persisted to `model-types.json` so they survive a
+restart. Each property defines its key, label, CSV column, min/max range,
+integer flag, and required flag — the same validation the records API enforces.
+
 ### Models
 
-The **Models** tab builds and compares several named models, each trained on a
-different data slice (e.g. houses vs. units) and each requiring a **business
-description** — a model with no business context cannot be trained. Trained
-models populate a selection menu; choosing one shows:
+The **Models** tab builds and compares named models. For each model you pick a
+**type**, give it a name and a required **business description** (a model with no
+business context cannot be trained), and optionally restrict training to a data
+slice (rows where a chosen column equals a value). The model trains on its
+type's properties, is saved to `models/<name>/`, and is reloaded on the next
+start. Trained models populate a selection menu; choosing one shows:
 
-- **Measures** — one row per input parameter (area, rooms, floor) with its
-  **strength** (how strongly it drives price), slope, deviation, slope/deviation
-  deltas vs. the previous measure, and purity (data quality).
+- **Measures** — one row per input property of the type with its **strength**
+  (how strongly it drives the target), slope, deviation, slope/deviation deltas
+  vs. the previous measure, and purity (data quality).
 - **Integration hierarchy** — measures ordered from the purest to the dirtiest,
   with the running (cumulative) strength.
 - **Total strength** — the model output: the sum of the strengths of the
@@ -92,8 +119,8 @@ models populate a selection menu; choosing one shows:
 
 Before training, the feature matrix is cleaned: outlier cells are clamped back
 to the norm and any measure too dirty to trust (default: >80% missing) is
-neutralised, so no dirty vector or measure can alter the model. Models are held
-in the server process memory for the session. See [GLOSSARY.md](GLOSSARY.md) for
+neutralised, so no dirty vector or measure can alter the model. Models are saved
+to disk (`models/`) and reloaded on startup. See [GLOSSARY.md](GLOSSARY.md) for
 the full term reference and API.
 
 ### REST API
@@ -107,6 +134,7 @@ curl -X POST http://localhost:3000/predict \
 ```
 
 Response:
+
 ```json
 {
   "input": [85, 3, 2],
@@ -125,9 +153,10 @@ curl -X POST http://localhost:3000/api/predict-from-metadata \
 ```
 
 Response:
+
 ```json
 {
-  "metadata": {"area": 85, "rooms": 3, "floor": 2},
+  "metadata": { "area": 85, "rooms": 3, "floor": 2 },
   "featureVector": [85, 3, 2],
   "prediction": "352.89"
 }
@@ -157,6 +186,7 @@ curl http://localhost:3000/health
 ```
 
 Response:
+
 ```json
 {
   "status": "ready",
@@ -180,6 +210,7 @@ Response:
 ### Defaults
 
 All configurable settings have defaults in **`config.js`**. At runtime they are layered with:
+
 1. Overrides saved in `runtime-config.json` (from admin panel)
 2. Environment variables (highest priority)
 
@@ -187,27 +218,27 @@ All configurable settings have defaults in **`config.js`**. At runtime they are 
 
 #### Model Architecture
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `model.featureCount` | 3 | Number of input features |
-| `model.hiddenUnits` | [32, 16] | Hidden layer sizes (relu activation) |
-| `model.dropoutRate` | 0.2 | Dropout after first layer |
-| `model.learningRate` | 0.01 | Adam optimizer learning rate |
+| Setting              | Default  | Description                          |
+| -------------------- | -------- | ------------------------------------ |
+| `model.featureCount` | 3        | Number of input features             |
+| `model.hiddenUnits`  | [32, 16] | Hidden layer sizes (relu activation) |
+| `model.dropoutRate`  | 0.2      | Dropout after first layer            |
+| `model.learningRate` | 0.01     | Adam optimizer learning rate         |
 
 #### Training
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `training.epochs` | 50 | Training iterations |
-| `training.batchSize` | 32 | Batch size for training |
-| `training.numSamples` | 200 | Synthetic samples per training run |
-| `training.targetWeights` | [50, 100, 75] | Label synthesis weights |
+| Setting                  | Default       | Description                        |
+| ------------------------ | ------------- | ---------------------------------- |
+| `training.epochs`        | 50            | Training iterations                |
+| `training.batchSize`     | 32            | Batch size for training            |
+| `training.numSamples`    | 200           | Synthetic samples per training run |
+| `training.targetWeights` | [50, 100, 75] | Label synthesis weights            |
 
 #### Server
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `server.port` | 3000 | HTTP listen port (override with `PORT` env var) |
+| Setting       | Default | Description                                     |
+| ------------- | ------- | ----------------------------------------------- |
+| `server.port` | 3000    | HTTP listen port (override with `PORT` env var) |
 
 #### Validation
 
@@ -232,20 +263,20 @@ Each field in `validation.fields` defines one input feature:
 
 #### Database
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `database.host` | localhost | PostgreSQL host |
-| `database.port` | 5432 | PostgreSQL port |
-| `database.database` | aircontent | Database name |
-| `database.user` | postgres | Database user |
-| `database.password` | "" | Database password |
-| `database.table` | properties | Table name for records |
-| `database.ssl` | false | Use SSL connection |
+| Setting             | Default    | Description            |
+| ------------------- | ---------- | ---------------------- |
+| `database.host`     | localhost  | PostgreSQL host        |
+| `database.port`     | 5432       | PostgreSQL port        |
+| `database.database` | aircontent | Database name          |
+| `database.user`     | postgres   | Database user          |
+| `database.password` | ""         | Database password      |
+| `database.table`    | properties | Table name for records |
+| `database.ssl`      | false      | Use SSL connection     |
 
 #### Tags
 
 ```javascript
-tags: ['apartment', 'house', 'studio', 'rental', 'sale', 'renovated', 'new']
+tags: ['apartment', 'house', 'studio', 'rental', 'sale', 'renovated', 'new'];
 ```
 
 Configurable vocabulary for tagging records. Records can also have ad-hoc tags not in this list.
@@ -282,6 +313,7 @@ CREATE INDEX properties_created_idx ON properties (created_at DESC);
 ```
 
 **Columns:**
+
 - `id` — Auto-increment record ID
 - `metadata` — JSONB containing validation fields (e.g., `{"area": 85, "rooms": 3, "floor": 2}`)
 - `tags` — Array of labels for filtering/searching
@@ -328,6 +360,7 @@ area,rooms,floor,tags,price
 ### Field Mapping
 
 The CSV importer maps columns to your configured validation fields **in order**:
+
 - Column mapping is done by name (e.g., "area", "rooms", "floor")
 - Missing or invalid data causes import errors (listed in response)
 - Successful records are stored in PostgreSQL
@@ -339,7 +372,7 @@ The CSV importer maps columns to your configured validation fields **in order**:
   "imported": [
     {
       "id": 1,
-      "metadata": {"area": 85, "rooms": 3, "floor": 2},
+      "metadata": { "area": 85, "rooms": 3, "floor": 2 },
       "tags": ["apartment", "sale"],
       "price": 350000,
       "created_at": "2026-06-06T10:10:00Z"
@@ -364,6 +397,7 @@ Input validation happens at two points:
 ### Validation Rules
 
 For each field:
+
 - **Required** check: reject if missing/null
 - **Type** check: must be a number
 - **Integer** check: if marked integer, reject decimals
@@ -372,6 +406,7 @@ For each field:
 ### Example Validation
 
 Config:
+
 ```javascript
 {
   key: 'area',
@@ -384,29 +419,43 @@ Config:
 ```
 
 Valid inputs:
+
 ```javascript
-{area: 85.5}     // ✓ decimal within range
-{area: 500}      // ✓ integer within range
+{
+  area: 85.5;
+} // ✓ decimal within range
+{
+  area: 500;
+} // ✓ integer within range
 ```
 
 Invalid inputs:
+
 ```javascript
-{area: null}     // ✗ required
-{area: 5}        // ✗ below min
-{area: 2000}     // ✗ above max
-{area: "large"}  // ✗ not a number
+{
+  area: null;
+} // ✗ required
+{
+  area: 5;
+} // ✗ below min
+{
+  area: 2000;
+} // ✗ above max
+{
+  area: 'large';
+} // ✗ not a number
 ```
 
 ## Model Architecture
 
 Default 3-input regression network:
 
-| Layer | Output | Activation | Notes |
-|-------|--------|------------|-------|
-| Dense (input 3) | 32 | ReLU | First hidden layer |
-| Dropout | 32 | — | 20% dropout |
-| Dense | 16 | ReLU | Second hidden layer |
-| Dense (output) | 1 | Linear | Prediction |
+| Layer           | Output | Activation | Notes               |
+| --------------- | ------ | ---------- | ------------------- |
+| Dense (input 3) | 32     | ReLU       | First hidden layer  |
+| Dropout         | 32     | —          | 20% dropout         |
+| Dense           | 16     | ReLU       | Second hidden layer |
+| Dense (output)  | 1      | Linear     | Prediction          |
 
 **Parameters:** ~673  
 **Optimizer:** Adam (lr=0.01)  
@@ -433,65 +482,73 @@ Save via the admin panel, then restart the server. The model is trained once at 
 .
 ├── config.js              # Default configuration
 ├── config-store.js        # Runtime config management (env vars + overrides)
-├── validation.js          # Input validation logic
+├── validation.js          # Input validation logic (global + per-type fields)
 ├── model.js               # ML model (createModel, trainModel, predict)
+├── model-types.js         # Model-type catalogue (wizard): built-in + custom types
 ├── db.js                  # PostgreSQL database layer
 ├── csv-import.js          # CSV parsing and import (DB)
-├── csv-dataset.js         # Shared CSV → feature-vector mapping
-├── csv-mapping-test.js    # CSV mapping/stability evaluation
+├── csv-dataset.js         # Schema-driven CSV → feature-vector mapping
 ├── measures.js            # Per-measure analytics + dirty-data cleaning
-├── model-registry.js      # Build several models from different data
-├── model-routes.js        # Admin API for building/inspecting models
+├── model-registry.js      # Build/persist models from a type; reload on startup
+├── model-routes.js        # Admin API for model types + building/inspecting models
 ├── admin.js               # Admin panel Express routes
 ├── ml-api.js              # Main API server (Express)
-├── ml-model.js            # CLI: train and predict
 ├── public/
-│   └── admin.html         # Browser admin panel UI
+│   ├── admin.html         # Browser admin panel UI
+│   └── images/            # Admin panel icons
+├── models/                # Trained models persisted to disk (gitignored)
+├── tmp/                   # Temporary files (gitignored)
+├── csv_example/           # Local example datasets (gitignored)
+├── test/                  # Unit tests (node --test)
 ├── package.json
 ├── eslint.config.js
 ├── .prettierrc.json
+├── GLOSSARY.md            # Term reference + how-to
 ├── LICENSE                # MIT License
 └── README.md
 ```
 
 ## Scripts
 
-| Script | Description |
-|--------|-------------|
-| `npm run ml:api` | Start the prediction API server (port 3000) |
-| `npm run ml:train` | Train model and print sample predictions (CLI) |
-| `npm run db:init` | Initialize PostgreSQL schema |
-| `npm run test:csv` | Map a housing CSV onto the model, with mapping/stability stats |
-| `npm test` | Run the unit tests (includes the multi-model registry) |
-| `npm run format` | Format with Prettier |
-| `npm run format:check` | Check formatting |
-| `npm run lint` | Lint with ESLint |
-| `npm run lint:fix` | Lint and auto-fix |
+| Script                 | Description                                       |
+| ---------------------- | ------------------------------------------------- |
+| `npm start`            | Start the prediction API server (port 3000)       |
+| `npm run ml:api`       | Alias for `npm start`                             |
+| `npm run db:init`      | Initialize PostgreSQL schema                      |
+| `npm test`             | Run the unit tests (model types + model registry) |
+| `npm run format`       | Format with Prettier                              |
+| `npm run format:check` | Check formatting                                  |
+| `npm run lint`         | Lint with ESLint                                  |
+| `npm run lint:fix`     | Lint and auto-fix                                 |
 
 ## API Endpoints
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | API documentation |
-| GET | `/health` | Server status and metrics |
-| GET | `/api/system` | OS-level resource stats (RAM, CPU, process heap, server counters) |
-| POST | `/predict` | Predict from feature vector |
-| POST | `/api/predict-from-metadata` | Predict from validated metadata |
-| GET | `/api/config` | Get current config |
-| POST | `/api/config` | Save config changes |
-| POST | `/api/config/reset` | Reset to defaults |
-| GET | `/api/records` | List records (paginated, filterable) |
-| POST | `/api/records` | Create record |
-| GET | `/api/records/:id` | Get record by ID |
-| DELETE | `/api/records/:id` | Delete record |
-| POST | `/api/csv/import` | Import CSV file |
-| GET | `/api/models` | List trained models (selection menu) |
-| GET | `/api/models/:name` | Model metadata + measures |
-| POST | `/api/models` | Build a model from a dataset (requires description) |
-| PATCH | `/api/models/:name` | Update a model's business description |
-| POST | `/api/models/:name/predict` | Predict with a named model |
-| DELETE | `/api/models/:name` | Remove a model |
-| GET | `/admin` | Admin panel (HTML) |
+| Method | Path                         | Description                                                       |
+| ------ | ---------------------------- | ----------------------------------------------------------------- |
+| GET    | `/`                          | API documentation                                                 |
+| GET    | `/health`                    | Server status and metrics                                         |
+| GET    | `/api/system`                | OS-level resource stats (RAM, CPU, process heap, server counters) |
+| POST   | `/predict`                   | Predict from feature vector                                       |
+| POST   | `/api/predict-from-metadata` | Predict from validated metadata                                   |
+| GET    | `/api/config`                | Get current config                                                |
+| POST   | `/api/config`                | Save config changes                                               |
+| POST   | `/api/config/reset`          | Reset to defaults                                                 |
+| GET    | `/api/records`               | List records (paginated, filterable)                              |
+| POST   | `/api/records`               | Create record                                                     |
+| GET    | `/api/records/:id`           | Get record by ID                                                  |
+| DELETE | `/api/records/:id`           | Delete record                                                     |
+| POST   | `/api/csv/import`            | Import CSV file                                                   |
+| GET    | `/api/model-types`           | List model types (wizard catalogue)                               |
+| GET    | `/api/model-types/:id`       | One model-type definition                                         |
+| POST   | `/api/model-types`           | Create/update a (custom or overridden) model type                 |
+| DELETE | `/api/model-types/:id`       | Delete a custom type / revert an edited built-in                  |
+| GET    | `/api/models`                | List trained models (selection menu)                              |
+| GET    | `/api/models/:name`          | Model metadata + measures                                         |
+| POST   | `/api/models`                | Build a model from a type + dataset (requires description)        |
+| PATCH  | `/api/models/:name`          | Update a model's business description                             |
+| POST   | `/api/models/:name/predict`  | Predict with a named model                                        |
+| DELETE | `/api/models/:name`          | Remove a model                                                    |
+| GET    | `/admin`                     | Admin panel (HTML)                                                |
 
 ## Error Handling
 
@@ -585,13 +642,21 @@ Validation is enforced at three levels to prevent invalid configs from ever reac
 
 ### Extensibility
 
-To add new validation fields:
+To train on a new domain, add a **model type** (no code change): open the
+**Model Types** tab, define its properties and target, then train a model from
+it on the Models tab. Built-in types live in `model-types.js`; custom ones are
+saved to `model-types.json`.
+
+To change the startup demo model's schema (`/predict`,
+`/api/predict-from-metadata`):
+
 1. Add entry to `validation.fields` in `config.js`
 2. Ensure `model.featureCount` matches field count
 3. Update `training.targetWeights` (one weight per field)
 4. Restart server
 
 To add new API endpoints:
+
 1. Create route in `admin.js` or `ml-api.js`
 2. Admin routes live in `admin.js` (mounted at root); ML routes in `ml-api.js`
 3. Validate input via `validation.js` or custom logic
@@ -599,8 +664,8 @@ To add new API endpoints:
 ## Glossary & How-To
 
 See **[GLOSSARY.md](GLOSSARY.md)** for term definitions and step-by-step guides
-on building models (including several models from different datasets via the
-model registry) and testing them.
+on defining model types, building models from them (including data slices), and
+testing them.
 
 ## License
 
@@ -609,6 +674,7 @@ MIT License 2.0 — See LICENSE file for details.
 ## Support
 
 For issues, questions, or contributions:
+
 - File issues on GitHub
 - Check admin panel logs (`/health` endpoint)
 - Review PostgreSQL connection settings in Database tab
@@ -616,5 +682,5 @@ For issues, questions, or contributions:
 
 ---
 
-**Version:** 2.0.0  
-**Updated:** 2026-06-06
+**Version:** 2.1.0  
+**Updated:** 2026-06-07

@@ -1,10 +1,11 @@
-// model-routes.js — admin API for building and inspecting several models.
+// model-routes.js — admin API for the model-type wizard plus building and
+// inspecting models.
 //
-// Models are trained on a server-side CSV (default: the local Melbourne file)
-// and held in the in-memory registry for the lifetime of the server process.
-// The admin panel uses these endpoints to populate its model-selection menu,
-// show per-model training statistics + measures, and predict with a chosen
-// model.
+// A model is trained on a server-side CSV against a chosen model type (the
+// schema of properties + target). Types are managed via /api/model-types;
+// models are persisted to disk and reloaded on startup. The admin panel uses
+// these endpoints to manage types, populate its model-selection menu, show
+// per-model statistics + measures, and predict with a chosen model.
 
 import express from 'express';
 import path from 'path';
@@ -18,16 +19,61 @@ import {
   predictWith,
   removeModel,
 } from './model-registry.js';
+import { listTypes, getType, saveType, removeType } from './model-types.js';
 import { getConfig } from './config-store.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_DATASET = 'csv_example/properties.csv';
 
-function resolveDataset(source) {
-  const rel = source && source.trim() ? source.trim() : DEFAULT_DATASET;
+// Default dataset per built-in type, so picking a type in the wizard needs no
+// manual path. Custom types must supply their own data source.
+const DEFAULT_DATASETS = {
+  realestate: 'csv_example/properties.csv',
+  cars: 'csv_example/cars.csv',
+  payroll: 'csv_example/payroll.csv',
+};
+const DEFAULT_DATASET = DEFAULT_DATASETS.realestate;
+
+function resolveDataset(source, typeId) {
+  const fallback = DEFAULT_DATASETS[typeId] || DEFAULT_DATASET;
+  const rel = source && source.trim() ? source.trim() : fallback;
   return path.isAbsolute(rel) ? rel : path.join(__dirname, rel);
 }
+
+// ── Model types (the wizard catalogue) ──────────────────────────────────────
+router.get('/api/model-types', (req, res) => {
+  const types = listTypes();
+  res.json({ types, count: types.length });
+});
+
+router.get('/api/model-types/:id', (req, res) => {
+  const type = getType(req.params.id);
+  if (!type) {
+    res.status(404).json({ error: `type "${req.params.id}" not found` });
+    return;
+  }
+  res.json(type);
+});
+
+// Create or update a (custom or overridden) model type.
+router.post('/api/model-types', express.json(), (req, res) => {
+  try {
+    res.status(201).json(saveType(req.body || {}));
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Delete a custom type, or revert an edited built-in to its shipped defaults.
+router.delete('/api/model-types/:id', (req, res) => {
+  if (!removeType(req.params.id)) {
+    res
+      .status(404)
+      .json({ error: `no custom definition for "${req.params.id}"` });
+    return;
+  }
+  res.json({ success: true });
+});
 
 // List trained models — drives the panel's model-selection menu.
 router.get('/api/models', (req, res) => {
@@ -45,11 +91,19 @@ router.get('/api/models/:name', (req, res) => {
   res.json(meta);
 });
 
-// Build (train) a model. A business description is mandatory.
+// Build (train) a model. A business description and a model type are mandatory.
 router.post('/api/models', express.json(), async (req, res) => {
   try {
-    const { name, description, type, source, sigma, dirtinessThreshold } =
-      req.body || {};
+    const {
+      name,
+      description,
+      typeId,
+      source,
+      segmentColumn,
+      segmentValue,
+      sigma,
+      dirtinessThreshold,
+    } = req.body || {};
     if (!name || !name.trim()) {
       res.status(400).json({ error: 'name is required' });
       return;
@@ -59,14 +113,24 @@ router.post('/api/models', express.json(), async (req, res) => {
       return;
     }
 
-    const dataset = resolveDataset(source);
+    const type = getType(typeId || 'realestate');
+    if (!type) {
+      res.status(400).json({ error: `unknown model type: ${typeId}` });
+      return;
+    }
+
+    const dataset = resolveDataset(source, type.id);
     if (!existsSync(dataset)) {
       res.status(400).json({ error: `dataset not found: ${dataset}` });
       return;
     }
 
-    const options = { description };
-    if (type && type !== 'all') options.filter = (row) => row.Type === type;
+    const options = { description, type };
+    // Optional generic slice: train only on rows where a column equals a value.
+    if (segmentColumn && segmentValue !== undefined && segmentValue !== '') {
+      options.filter = (row) =>
+        String(row[segmentColumn]) === String(segmentValue);
+    }
     if (Number.isFinite(sigma)) options.sigma = sigma;
     if (Number.isFinite(dirtinessThreshold))
       options.dirtinessThreshold = dirtinessThreshold;
@@ -94,7 +158,12 @@ router.post('/api/models/:name/predict', express.json(), async (req, res) => {
   try {
     const body = req.body;
     const input = Array.isArray(body) ? body : body && body.input;
-    const featureCount = getConfig().model.featureCount;
+    // Expected feature count comes from the model's own type, not the global
+    // config — each model can have a different number of properties.
+    const meta = getMeta(req.params.name);
+    const featureCount = meta
+      ? meta.featureKeys.length
+      : getConfig().model.featureCount;
     if (!Array.isArray(input) || input.length !== featureCount) {
       res
         .status(400)

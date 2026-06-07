@@ -1,11 +1,12 @@
-// csv-dataset.js — shared CSV parsing + mapping onto the model feature vector.
+// csv-dataset.js — shared CSV parsing + mapping onto a model feature vector.
 //
-// Single source of truth for turning a raw housing CSV into validated training
-// data. Consumed by csv-mapping-test.js (evaluation) and model-registry.js
-// (building several models from different data slices).
+// Single source of truth for turning a raw CSV into validated training data.
+// The schema (which properties, which CSV columns, which target) is supplied by
+// the caller — model-registry.js passes the chosen model type's schema — so the
+// same loader serves real estate, cars, payroll and any user-defined type.
 
 import { readFileSync } from 'fs';
-import { validateRecord, ValidationError } from './validation.js';
+import { validateAgainstFields, ValidationError } from './validation.js';
 import { getConfig } from './config-store.js';
 
 // Default projection of CSV columns onto the model's [area, rooms, floor].
@@ -48,56 +49,78 @@ export function loadRows(filePath) {
   });
 }
 
-// Map + validate one row. Returns a mapped record or a structured rejection so
-// callers can tally exactly why rows drop out.
+// Resolve the field definitions, column map and target for a mapping run.
+// Defaults to the global validation schema so existing callers keep working;
+// the model-type pipeline passes an explicit schema instead.
+function resolveSchema(options) {
+  const fields = options.fields || getConfig().validation.fields;
+  const columnMap =
+    options.columnMap ||
+    fields.reduce((m, f) => {
+      m[f.key] = f.column || f.key;
+      return m;
+    }, {});
+  const target = options.target || DEFAULT_TARGET_COLUMN;
+  const targetColumn = typeof target === 'string' ? target : target.column;
+  return { fields, columnMap, targetColumn };
+}
+
+// Map + validate one row against a field schema. Returns a mapped record or a
+// structured rejection so callers can tally exactly why rows drop out.
 export function mapRow(
   row,
   columnMap = DEFAULT_COLUMN_MAP,
-  target = DEFAULT_TARGET_COLUMN
+  target = DEFAULT_TARGET_COLUMN,
+  fields = getConfig().validation.fields
 ) {
-  const fields = getConfig().validation.fields.map((f) => f.key);
+  const targetColumn = typeof target === 'string' ? target : target.column;
   const record = {};
-  for (const key of fields) {
-    const raw = row[columnMap[key]];
+  for (const field of fields) {
+    const raw = row[columnMap[field.key]];
     const num = parseFloat(raw);
     if (raw === undefined || raw === '' || Number.isNaN(num)) {
       return {
         ok: false,
         reason: 'mapping',
-        detail: `${key}: empty/non-numeric`,
+        detail: `${field.key}: empty/non-numeric`,
       };
     }
-    record[key] = num;
+    record[field.key] = num;
   }
   try {
-    validateRecord(record);
+    validateAgainstFields(record, fields);
   } catch (e) {
     if (e instanceof ValidationError) {
       return { ok: false, reason: 'validation', detail: e.message };
     }
     throw e;
   }
-  const price = parseFloat(row[target]);
+  const price = parseFloat(row[targetColumn]);
   if (Number.isNaN(price)) {
-    return { ok: false, reason: 'target', detail: 'price empty/non-numeric' };
+    return { ok: false, reason: 'target', detail: 'target empty/non-numeric' };
   }
-  return { ok: true, record, vector: fields.map((k) => record[k]), price };
+  return {
+    ok: true,
+    record,
+    vector: fields.map((f) => record[f.key]),
+    price,
+  };
 }
 
 // Load a CSV and return validated training data plus mapping statistics.
-// `options.filter(row)` optionally restricts which rows are considered — this is
-// how several models are built from different slices of the same file.
+//   options.fields    — field definitions (defaults to global validation schema)
+//   options.columnMap — key → CSV column (defaults to each field's `column`)
+//   options.target    — target column name or { column } (defaults to "price")
+//   options.filter(row) — optionally restrict which rows are considered, so
+//     several models can be built from different slices of the same file.
 export function mapDataset(filePath, options = {}) {
-  const {
-    columnMap = DEFAULT_COLUMN_MAP,
-    target = DEFAULT_TARGET_COLUMN,
-    filter = null,
-  } = options;
+  const { fields, columnMap, targetColumn } = resolveSchema(options);
+  const { filter = null } = options;
 
   const allRows = loadRows(filePath);
   const rows = filter ? allRows.filter(filter) : allRows;
 
-  const fieldKeys = getConfig().validation.fields.map((f) => f.key);
+  const fieldKeys = fields.map((f) => f.key);
   const fieldStats = {};
   for (const key of fieldKeys) fieldStats[key] = { considered: 0, present: 0 };
 
@@ -119,7 +142,7 @@ export function mapDataset(filePath, options = {}) {
       }
     }
 
-    const r = mapRow(row, columnMap, target);
+    const r = mapRow(row, columnMap, targetColumn, fields);
     if (r.ok) {
       vectors.push(r.vector);
       prices.push(r.price);
