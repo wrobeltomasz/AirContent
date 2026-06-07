@@ -16,7 +16,8 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test"
+    "test": "node --test",
+    "test:csv": "node csv-mapping-test.js"
   },
   "keywords": [
     "tensorflow",

@@ -52,6 +52,33 @@ export async function trainModel(
   return model;
 }
 
+// Train a model on real mapped data (vectors + target prices) instead of the
+// synthetic generator. Used to build several models from different datasets.
+export async function trainModelOnData(
+  model,
+  vectors,
+  prices,
+  {
+    epochs = getConfig().training.epochs,
+    batchSize = getConfig().training.batchSize,
+  } = {}
+) {
+  if (!vectors.length) {
+    throw new Error('trainModelOnData: no training rows provided');
+  }
+  const features = tf.tensor2d(vectors);
+  const labels = tf.tensor2d(prices.map((p) => [p]));
+  const history = await model.fit(features, labels, {
+    epochs,
+    batchSize,
+    verbose: 0,
+  });
+  features.dispose();
+  labels.dispose();
+  const mae = history.history.mae;
+  return { finalMae: mae ? mae[mae.length - 1] : null };
+}
+
 export async function predict(model, input) {
   const tensor = tf.tensor2d([input]);
   const output = model.predict(tensor);

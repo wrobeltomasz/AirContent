@@ -4,6 +4,7 @@ import { getConfig } from './config-store.js';
 import { metadataToFeatureVector, ValidationError } from './validation.js';
 import * as db from './db.js';
 import adminRoutes from './admin.js';
+import modelRoutes from './model-routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -79,6 +80,7 @@ async function startServer() {
   app.use(express.static(path.join(__dirname, 'public')));
 
   app.use(adminRoutes);
+  app.use(modelRoutes);
 
   app.get('/admin', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -94,6 +96,9 @@ async function startServer() {
         'GET /admin': 'Admin panel (browser)',
         'POST /api/records': 'Create record (admin)',
         'GET /api/records': 'List records (admin)',
+        'GET /api/models': 'List trained models (admin)',
+        'POST /api/models': 'Build a model from a dataset (admin)',
+        'POST /api/models/:name/predict': 'Predict with a named model (admin)',
       },
       example:
         'curl -X POST -H "Content-Type: application/json" -d "[85, 3, 2]" http://localhost:3000/predict',

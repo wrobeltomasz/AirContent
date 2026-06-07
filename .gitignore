@@ -14,6 +14,9 @@ runtime-config.json
 # ── Temporary files created by CSV import ────────────────────
 temp-*.csv
 
+# ── Local CSV test datasets (not distributed) ────────────────
+csv_example/
+
 # ── Logs ─────────────────────────────────────────────────────
 logs/
 *.log

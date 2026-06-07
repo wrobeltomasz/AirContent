@@ -64,6 +64,7 @@ Open **http://localhost:3000/admin** in your browser.
 
 **Tabs:**
 - **Dashboard** — System overview and metrics
+- **Models** — Train several models on different data slices and inspect each one's measures
 - **Validation** — Configure input validation rules and allowed ranges
 - **Model** — Tune hyperparameters (learning rate, hidden units, epochs, etc.)
 - **Database** — Configure PostgreSQL connection
@@ -71,6 +72,28 @@ Open **http://localhost:3000/admin** in your browser.
 - **CSV Import** — Bulk upload CSV files with field mapping
 
 All changes are persisted to `runtime-config.json` and applied immediately.
+
+### Models
+
+The **Models** tab builds and compares several named models, each trained on a
+different data slice (e.g. houses vs. units) and each requiring a **business
+description** — a model with no business context cannot be trained. Trained
+models populate a selection menu; choosing one shows:
+
+- **Measures** — one row per input parameter (area, rooms, floor) with its
+  **strength** (how strongly it drives price), slope, deviation, slope/deviation
+  deltas vs. the previous measure, and purity (data quality).
+- **Integration hierarchy** — measures ordered from the purest to the dirtiest,
+  with the running (cumulative) strength.
+- **Total strength** — the model output: the sum of the strengths of the
+  measures it kept.
+- A **predict box** for ad-hoc valuations with the selected model.
+
+Before training, the feature matrix is cleaned: outlier cells are clamped back
+to the norm and any measure too dirty to trust (default: >80% missing) is
+neutralised, so no dirty vector or measure can alter the model. Models are held
+in the server process memory for the session. See [GLOSSARY.md](GLOSSARY.md) for
+the full term reference and API.
 
 ### REST API
 
@@ -412,7 +435,12 @@ Save via the admin panel, then restart the server. The model is trained once at 
 ├── validation.js          # Input validation logic
 ├── model.js               # ML model (createModel, trainModel, predict)
 ├── db.js                  # PostgreSQL database layer
-├── csv-import.js          # CSV parsing and import
+├── csv-import.js          # CSV parsing and import (DB)
+├── csv-dataset.js         # Shared CSV → feature-vector mapping
+├── csv-mapping-test.js    # CSV mapping/stability evaluation
+├── measures.js            # Per-measure analytics + dirty-data cleaning
+├── model-registry.js      # Build several models from different data
+├── model-routes.js        # Admin API for building/inspecting models
 ├── admin.js               # Admin panel Express routes
 ├── ml-api.js              # Main API server (Express)
 ├── ml-model.js            # CLI: train and predict
@@ -432,6 +460,8 @@ Save via the admin panel, then restart the server. The model is trained once at 
 | `npm run ml:api` | Start the prediction API server (port 3000) |
 | `npm run ml:train` | Train model and print sample predictions (CLI) |
 | `npm run db:init` | Initialize PostgreSQL schema |
+| `npm run test:csv` | Map a housing CSV onto the model, with mapping/stability stats |
+| `npm test` | Run the unit tests (includes the multi-model registry) |
 | `npm run format` | Format with Prettier |
 | `npm run format:check` | Check formatting |
 | `npm run lint` | Lint with ESLint |
@@ -453,6 +483,12 @@ Save via the admin panel, then restart the server. The model is trained once at 
 | GET | `/api/records/:id` | Get record by ID |
 | DELETE | `/api/records/:id` | Delete record |
 | POST | `/api/csv/import` | Import CSV file |
+| GET | `/api/models` | List trained models (selection menu) |
+| GET | `/api/models/:name` | Model metadata + measures |
+| POST | `/api/models` | Build a model from a dataset (requires description) |
+| PATCH | `/api/models/:name` | Update a model's business description |
+| POST | `/api/models/:name/predict` | Predict with a named model |
+| DELETE | `/api/models/:name` | Remove a model |
 | GET | `/admin` | Admin panel (HTML) |
 
 ## Error Handling
@@ -557,6 +593,12 @@ To add new API endpoints:
 1. Create route in `admin.js` or `ml-api.js`
 2. Admin routes live in `admin.js` (mounted at root); ML routes in `ml-api.js`
 3. Validate input via `validation.js` or custom logic
+
+## Glossary & How-To
+
+See **[GLOSSARY.md](GLOSSARY.md)** for term definitions and step-by-step guides
+on building models (including several models from different datasets via the
+model registry) and testing them.
 
 ## License
 
