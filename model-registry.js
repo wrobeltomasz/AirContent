@@ -10,12 +10,60 @@
 // stored in-memory keyed by a caller-chosen name so they can be predicted
 // against independently.
 
+import * as tf from '@tensorflow/tfjs';
+import '@tensorflow/tfjs-layers';
+import {
+  mkdirSync,
+  existsSync,
+  rmSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { createModel, trainModelOnData, predict } from './model.js';
 import { mapDataset } from './csv-dataset.js';
 import { computeMeasures, cleanMatrix } from './measures.js';
 import { getConfig } from './config-store.js';
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+export const MODELS_DIR = path.join(__dirname, 'models');
+export const TMP_DIR = path.join(__dirname, 'tmp');
+
 const registry = new Map();
+
+function ensureDir(dir) {
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+}
+
+async function saveModelToDisk(name, model, meta) {
+  const dir = path.join(MODELS_DIR, name);
+  ensureDir(dir);
+  await model.save(`file://${dir}`);
+  writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+}
+
+export async function initRegistry() {
+  ensureDir(MODELS_DIR);
+  ensureDir(TMP_DIR);
+  if (!existsSync(MODELS_DIR)) return;
+  const entries = readdirSync(MODELS_DIR, { withFileTypes: true });
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const dir = path.join(MODELS_DIR, entry.name);
+    const metaPath = path.join(dir, 'meta.json');
+    const modelPath = path.join(dir, 'model.json');
+    if (!existsSync(metaPath) || !existsSync(modelPath)) continue;
+    try {
+      const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+      const model = await tf.loadLayersModel(`file://${modelPath}`);
+      registry.set(entry.name, { model, meta });
+    } catch (e) {
+      console.warn(`[registry] failed to load model "${entry.name}": ${e.message}`);
+    }
+  }
+}
 
 // Build (train) one named model from a CSV file.
 //   options.description           — business context for the model (required)
@@ -75,6 +123,7 @@ export async function buildModelFromCSV(name, filePath, options = {}) {
     trainedAt: new Date().toISOString(),
   };
   registry.set(name, { model, meta });
+  await saveModelToDisk(name, model, meta);
   return meta;
 }
 
@@ -102,6 +151,10 @@ export function setDescription(name, description) {
     throw new Error('a business description is required');
   }
   entry.meta.description = String(description).trim();
+  const metaPath = path.join(MODELS_DIR, name, 'meta.json');
+  if (existsSync(metaPath)) {
+    writeFileSync(metaPath, JSON.stringify(entry.meta, null, 2), 'utf8');
+  }
   return entry.meta;
 }
 
@@ -110,6 +163,8 @@ export async function predictWith(name, input) {
 }
 
 export function removeModel(name) {
+  const dir = path.join(MODELS_DIR, name);
+  if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
   return registry.delete(name);
 }
 

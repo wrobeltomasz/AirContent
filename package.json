@@ -10,14 +10,12 @@
   "scripts": {
     "start": "node ml-api.js",
     "ml:api": "node ml-api.js",
-    "ml:train": "node ml-model.js",
     "db:init": "node --input-type=module -e \"import('./db.js').then(m=>m.initSchema()).then(()=>{console.log('Schema ready');process.exit(0)}).catch(e=>{console.error(e.message);process.exit(1)})\"",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test",
-    "test:csv": "node csv-mapping-test.js"
+    "test": "node --test"
   },
   "keywords": [
     "tensorflow",

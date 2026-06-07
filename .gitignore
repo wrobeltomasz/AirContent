@@ -11,8 +11,9 @@ package-lock.json.backup
 # ── Runtime config overrides (admin panel saves here) ────────
 runtime-config.json
 
-# ── Temporary files created by CSV import ────────────────────
-temp-*.csv
+# ── Temporary files ──────────────────────────────────────────
+tmp/*
+!tmp/.gitkeep
 
 # ── Local CSV test datasets (not distributed) ────────────────
 csv_example/

@@ -5,6 +5,7 @@ import { metadataToFeatureVector, ValidationError } from './validation.js';
 import * as db from './db.js';
 import adminRoutes from './admin.js';
 import modelRoutes from './model-routes.js';
+import { initRegistry } from './model-registry.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import os from 'os';
@@ -322,6 +323,7 @@ async function startServer() {
 
 (async () => {
   log('info', 'Server process starting', { startedAt: state.startedAt });
+  await initRegistry();
   await initializeModel();
   await startServer();
 })().catch((error) => {
