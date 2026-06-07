@@ -8,13 +8,13 @@ import { readFileSync } from 'fs';
 import { validateRecord, ValidationError } from './validation.js';
 import { getConfig } from './config-store.js';
 
-// Default projection of Melbourne columns onto the model's [area, rooms, floor].
+// Default projection of CSV columns onto the model's [area, rooms, floor].
 export const DEFAULT_COLUMN_MAP = {
-  area: 'BuildingArea',
-  rooms: 'Rooms',
-  floor: 'Bathroom',
+  area: 'area',
+  rooms: 'rooms',
+  floor: 'floor',
 };
-export const DEFAULT_TARGET_COLUMN = 'Price';
+export const DEFAULT_TARGET_COLUMN = 'price';
 
 export function parseCSVLine(line) {
   const out = [];

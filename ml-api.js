@@ -7,6 +7,7 @@ import adminRoutes from './admin.js';
 import modelRoutes from './model-routes.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -129,6 +130,64 @@ async function startServer() {
           : null,
       slowResponses: state.slowResponses,
       recordsIngested: cfg.metrics.business.recordsIngested || 0,
+    });
+  });
+
+  app.get('/api/system', (req, res) => {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpus = os.cpus();
+    const loadAvg = os.loadavg();
+    const mem = process.memoryUsage();
+    const platform = os.platform();
+
+    sendJson(res, 200, {
+      system: {
+        platform,
+        arch: os.arch(),
+        hostname: os.hostname(),
+        nodeVersion: process.version,
+        osUptimeSeconds: Math.floor(os.uptime()),
+      },
+      memory: {
+        totalMB: Math.round(totalMem / 1048576),
+        freeMB: Math.round(freeMem / 1048576),
+        usedMB: Math.round(usedMem / 1048576),
+        usagePct: parseFloat(((usedMem / totalMem) * 100).toFixed(1)),
+      },
+      cpu: {
+        count: cpus.length,
+        model: cpus[0]?.model || 'unknown',
+        loadAvgSupported: platform !== 'win32',
+        loadAvg1m: parseFloat(loadAvg[0].toFixed(2)),
+        loadAvg5m: parseFloat(loadAvg[1].toFixed(2)),
+        loadAvg15m: parseFloat(loadAvg[2].toFixed(2)),
+      },
+      process: {
+        heapUsedMB: parseFloat((mem.heapUsed / 1048576).toFixed(1)),
+        heapTotalMB: parseFloat((mem.heapTotal / 1048576).toFixed(1)),
+        heapUsagePct: parseFloat(((mem.heapUsed / mem.heapTotal) * 100).toFixed(1)),
+        rssMB: parseFloat((mem.rss / 1048576).toFixed(1)),
+        externalMB: parseFloat((mem.external / 1048576).toFixed(1)),
+        uptimeSeconds: Math.floor(process.uptime()),
+      },
+      server: {
+        uptimeSeconds: Math.floor((Date.now() - startMs) / 1000),
+        status: state.status,
+        requests: state.requests,
+        predictions: state.predictions,
+        errors: state.errors,
+        responses: state.responses,
+        bytesSentKB: parseFloat((state.bytesSent / 1024).toFixed(1)),
+        avgResponseTimeMs:
+          state.responses > 0
+            ? Number((state.totalResponseTimeMs / state.responses).toFixed(2))
+            : null,
+        lastResponseTimeMs: state.lastResponseTimeMs,
+        maxResponseTimeMs: state.maxResponseTimeMs,
+        slowResponses: state.slowResponses,
+      },
     });
   });
 

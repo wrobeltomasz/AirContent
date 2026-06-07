@@ -22,7 +22,7 @@ import { getConfig } from './config-store.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULT_DATASET = 'csv_example/Melbourne_housing_FULL.csv';
+const DEFAULT_DATASET = 'csv_example/properties.csv';
 
 function resolveDataset(source) {
   const rel = source && source.trim() ? source.trim() : DEFAULT_DATASET;

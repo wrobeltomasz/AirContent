@@ -278,6 +278,13 @@
       padding: 1px 5px; border-radius: 3px;
     }
 
+    /* ── Resource bars ── */
+    .res-bar { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+    .res-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s ease; }
+    .res-bar-fill.ok   { background: var(--success); }
+    .res-bar-fill.warn { background: #F59E0B; }
+    .res-bar-fill.crit { background: var(--danger); }
+
     /* ── Misc ── */
     .sep { height: 1px; background: var(--border); margin: 20px 0; }
     .sub-label { font-size: 0.73rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--secondary); margin-bottom: 10px; }
@@ -306,6 +313,10 @@
   <div class="nav-item active" data-sec="dashboard">
     <img class="nav-icon" src="/images/dashboard.png" alt="">
     Dashboard
+  </div>
+  <div class="nav-item" data-sec="system">
+    <img class="nav-icon" src="/images/computer.png" alt="">
+    System
   </div>
   <div class="nav-item" data-sec="models">
     <img class="nav-icon" src="/images/automation.png" alt="">
@@ -400,6 +411,75 @@
         </div>
         <div class="tbl-wrap">
           <table><tbody id="dash-db-tbl"><tr><td class="td-dim">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SYSTEM ═══ -->
+  <section class="section" id="sec-system">
+    <div class="page-hdr">
+      <h1 class="page-title">System Resources</h1>
+      <p class="page-sub">Server hardware parameters for model training and deployment</p>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/data_thresholding.png" alt="">
+        <span class="stat-label">RAM Usage</span>
+        <div class="stat-value" id="sys-ram-pct">—</div>
+        <div class="res-bar"><div class="res-bar-fill ok" id="sys-ram-bar" style="width:0%"></div></div>
+        <span class="stat-desc" id="sys-ram-desc">of total memory</span>
+      </div>
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/database.png" alt="">
+        <span class="stat-label">Free Memory</span>
+        <div class="stat-value" id="sys-free-mem">—</div>
+        <span class="stat-desc">available RAM</span>
+      </div>
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/bar_chart.png" alt="">
+        <span class="stat-label">CPU Cores</span>
+        <div class="stat-value" id="sys-cpu-cores">—</div>
+        <span class="stat-desc" id="sys-cpu-model">logical processors</span>
+      </div>
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/bar_chart.png" alt="">
+        <span class="stat-label">Load Avg 1m</span>
+        <div class="stat-value" id="sys-load-1m">—</div>
+        <span class="stat-desc" id="sys-load-note">CPU load average</span>
+      </div>
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/data_thresholding.png" alt="">
+        <span class="stat-label">Heap Used</span>
+        <div class="stat-value" id="sys-heap-pct">—</div>
+        <div class="res-bar"><div class="res-bar-fill ok" id="sys-heap-bar" style="width:0%"></div></div>
+        <span class="stat-desc" id="sys-heap-desc">process V8 heap</span>
+      </div>
+      <div class="stat-card">
+        <img class="stat-icon" src="/images/watch_screentime.png" alt="">
+        <span class="stat-label">Server Uptime</span>
+        <div class="stat-value" id="sys-uptime" style="font-size:1.2rem">—</div>
+        <span class="stat-desc">since last restart</span>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title"><img src="/images/automation.png" alt="">Training Resources</span>
+          <button class="btn btn-ghost btn-sm" onclick="loadSystemStats()">Refresh</button>
+        </div>
+        <div class="tbl-wrap">
+          <table><tbody id="sys-training-tbl"><tr><td class="td-dim">Loading…</td></tr></tbody></table>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-title"><img src="/images/computer.png" alt="">Deployment Resources</span>
+        </div>
+        <div class="tbl-wrap">
+          <table><tbody id="sys-deploy-tbl"><tr><td class="td-dim">Loading…</td></tr></tbody></table>
         </div>
       </div>
     </div>
@@ -894,6 +974,7 @@
 
 <script>
   let currentConfig = null;
+  let sysRefreshTimer = null;
 
   // ── Navigation ──────────────────────────────────────────────
   document.querySelectorAll('.nav-item').forEach(item => {
@@ -902,6 +983,11 @@
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
       item.classList.add('active');
       document.getElementById('sec-' + item.dataset.sec).classList.add('active');
+      if (sysRefreshTimer) { clearInterval(sysRefreshTimer); sysRefreshTimer = null; }
+      if (item.dataset.sec === 'system') {
+        loadSystemStats();
+        sysRefreshTimer = setInterval(loadSystemStats, 5000);
+      }
     });
   });
 
@@ -1407,6 +1493,96 @@
       currentModelName = ''; currentModelMeta = null;
       loadModels();
     } catch (e) { showAlert('Failed to delete: ' + e.message, 'error'); }
+  }
+
+  // ── System Resources ────────────────────────────────────────
+  function fmtMB(mb) {
+    return mb >= 1024 ? (mb / 1024).toFixed(1) + ' GB' : mb + ' MB';
+  }
+
+  function fmtUptime(s) {
+    const d = Math.floor(s / 86400);
+    const h = Math.floor((s % 86400) / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m ${sec}s`;
+    return `${m}m ${sec}s`;
+  }
+
+  function resBarClass(pct) {
+    return 'res-bar-fill ' + (pct > 85 ? 'crit' : pct > 65 ? 'warn' : 'ok');
+  }
+
+  async function loadSystemStats() {
+    try {
+      const res = await fetch('/api/system');
+      if (!res.ok) { showAlert('Failed to load system stats', 'error'); return; }
+      const d = await res.json();
+
+      const ramPct = d.memory.usagePct;
+      document.getElementById('sys-ram-pct').textContent = ramPct + '%';
+      const ramBar = document.getElementById('sys-ram-bar');
+      ramBar.style.width = ramPct + '%';
+      ramBar.className = resBarClass(ramPct);
+      document.getElementById('sys-ram-desc').textContent =
+        fmtMB(d.memory.usedMB) + ' / ' + fmtMB(d.memory.totalMB);
+
+      document.getElementById('sys-free-mem').textContent = fmtMB(d.memory.freeMB);
+
+      document.getElementById('sys-cpu-cores').textContent = d.cpu.count;
+      document.getElementById('sys-cpu-model').textContent = d.cpu.model;
+
+      const loadVal = d.cpu.loadAvgSupported ? d.cpu.loadAvg1m.toFixed(2) : '—';
+      document.getElementById('sys-load-1m').textContent = loadVal;
+      document.getElementById('sys-load-note').textContent =
+        d.cpu.loadAvgSupported ? 'CPU load average' : 'Not available on Windows';
+
+      const heapPct = d.process.heapUsagePct;
+      document.getElementById('sys-heap-pct').textContent = heapPct.toFixed(1) + '%';
+      const heapBar = document.getElementById('sys-heap-bar');
+      heapBar.style.width = Math.min(heapPct, 100) + '%';
+      heapBar.className = resBarClass(heapPct);
+      document.getElementById('sys-heap-desc').textContent =
+        d.process.heapUsedMB.toFixed(0) + ' MB / ' + d.process.heapTotalMB.toFixed(0) + ' MB';
+
+      document.getElementById('sys-uptime').textContent = fmtUptime(d.server.uptimeSeconds);
+
+      const loadLine = d.cpu.loadAvgSupported
+        ? `${d.cpu.loadAvg1m} / ${d.cpu.loadAvg5m} / ${d.cpu.loadAvg15m}`
+        : '— (not available on Windows)';
+
+      document.getElementById('sys-training-tbl').innerHTML = `
+        <tr><td class="td-dim">Total RAM</td><td class="td-mono">${fmtMB(d.memory.totalMB)}</td></tr>
+        <tr><td class="td-dim">Used RAM</td><td class="td-mono">${fmtMB(d.memory.usedMB)} (${d.memory.usagePct}%)</td></tr>
+        <tr><td class="td-dim">Free RAM</td><td class="td-mono">${fmtMB(d.memory.freeMB)}</td></tr>
+        <tr><td class="td-dim">CPU Cores</td><td class="td-mono">${d.cpu.count} logical</td></tr>
+        <tr><td class="td-dim">CPU Model</td><td class="td-mono" style="font-size:0.73rem">${d.cpu.model}</td></tr>
+        <tr><td class="td-dim">Load Avg 1m / 5m / 15m</td><td class="td-mono">${loadLine}</td></tr>
+        <tr><td class="td-dim">Platform / Arch</td><td class="td-mono">${d.system.platform} / ${d.system.arch}</td></tr>
+        <tr><td class="td-dim">Node.js Version</td><td class="td-mono">${d.system.nodeVersion}</td></tr>
+        <tr><td class="td-dim">OS Uptime</td><td class="td-mono">${fmtUptime(d.system.osUptimeSeconds)}</td></tr>
+      `;
+
+      const avgMs = d.server.avgResponseTimeMs;
+      document.getElementById('sys-deploy-tbl').innerHTML = `
+        <tr><td class="td-dim">Process Heap Used</td><td class="td-mono">${d.process.heapUsedMB.toFixed(1)} MB</td></tr>
+        <tr><td class="td-dim">Process Heap Total</td><td class="td-mono">${d.process.heapTotalMB.toFixed(1)} MB</td></tr>
+        <tr><td class="td-dim">RSS (Resident Set)</td><td class="td-mono">${d.process.rssMB.toFixed(1)} MB</td></tr>
+        <tr><td class="td-dim">External Buffers</td><td class="td-mono">${d.process.externalMB.toFixed(1)} MB</td></tr>
+        <tr><td class="td-dim">Process Uptime</td><td class="td-mono">${fmtUptime(d.process.uptimeSeconds)}</td></tr>
+        <tr><td class="td-dim">Total Requests</td><td class="td-mono">${d.server.requests}</td></tr>
+        <tr><td class="td-dim">Predictions Served</td><td class="td-mono">${d.server.predictions}</td></tr>
+        <tr><td class="td-dim">Errors</td><td class="td-mono">${d.server.errors}</td></tr>
+        <tr><td class="td-dim">Avg Response Time</td><td class="td-mono">${avgMs != null ? avgMs + ' ms' : '—'}</td></tr>
+        <tr><td class="td-dim">Max Response Time</td><td class="td-mono">${d.server.maxResponseTimeMs ? d.server.maxResponseTimeMs + ' ms' : '—'}</td></tr>
+        <tr><td class="td-dim">Slow Responses</td><td class="td-mono">${d.server.slowResponses}</td></tr>
+        <tr><td class="td-dim">Data Sent</td><td class="td-mono">${d.server.bytesSentKB.toFixed(1)} KB</td></tr>
+        <tr><td class="td-dim">Hostname</td><td class="td-mono">${d.system.hostname}</td></tr>
+      `;
+    } catch (e) {
+      showAlert('System stats unavailable: ' + e.message, 'error');
+    }
   }
 
   // ── Init ────────────────────────────────────────────────────

@@ -64,6 +64,7 @@ Open **http://localhost:3000/admin** in your browser.
 
 **Tabs:**
 - **Dashboard** — System overview and metrics
+- **System** — Live server hardware stats: RAM, CPU, process heap, request counters, uptime (auto-refreshes every 5 s)
 - **Models** — Train several models on different data slices and inspect each one's measures
 - **Validation** — Configure input validation rules and allowed ranges
 - **Model** — Tune hyperparameters (learning rate, hidden units, epochs, etc.)
@@ -473,6 +474,7 @@ Save via the admin panel, then restart the server. The model is trained once at 
 |--------|------|-------------|
 | GET | `/` | API documentation |
 | GET | `/health` | Server status and metrics |
+| GET | `/api/system` | OS-level resource stats (RAM, CPU, process heap, server counters) |
 | POST | `/predict` | Predict from feature vector |
 | POST | `/api/predict-from-metadata` | Predict from validated metadata |
 | GET | `/api/config` | Get current config |
